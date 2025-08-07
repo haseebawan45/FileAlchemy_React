@@ -8,12 +8,14 @@ import AboutPage from './components/AboutPage';
 import HelpPage from './components/HelpPage';
 import SettingsPage from './components/SettingsPage';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import AuthPage from './components/AuthPage';
 import Notifications from './components/ui/Notifications';
 import PWAInstallPrompt, { PWAServiceWorker } from './components/PWAInstallPrompt';
 
 function App() {
   const [currentView, setCurrentView] = useState('home');
   const [conversionHistory, setConversionHistory] = useState([]);
+  const [user, setUser] = useState(null);
 
   // Load history from localStorage
   useEffect(() => {
@@ -40,6 +42,11 @@ function App() {
 
   const addToHistory = (conversion) => {
     setConversionHistory(prev => [conversion, ...prev.slice(0, 9)]); // Keep last 10
+  };
+
+  const handleAuthSuccess = (userData) => {
+    setUser(userData);
+    handleNavigation('home');
   };
 
   // Handle keyboard shortcuts
@@ -91,6 +98,8 @@ function App() {
         return <SettingsPage history={conversionHistory} onClearHistory={() => setConversionHistory([])} />;
       case 'analytics':
         return <AnalyticsDashboard history={conversionHistory} />;
+      case 'auth':
+        return <AuthPage onSuccess={handleAuthSuccess} onBack={() => handleNavigation('home')} />;
       default:
         return <HomePage onCategorySelect={handleCategorySelect} />;
     }
@@ -99,7 +108,7 @@ function App() {
   return (
     <AppProvider>
       <div className="min-h-screen flex flex-col">
-        <Header currentView={currentView} onNavigate={handleNavigation} />
+        <Header currentView={currentView} onNavigate={handleNavigation} user={user} />
         
         <main className="flex-1">
           <PWAInstallPrompt />
