@@ -8,14 +8,6 @@ const Header = ({ currentView, onNavigate }) => {
   
   const toggleDarkMode = () => {
     dispatch({ type: actions.TOGGLE_DARK_MODE });
-    // Force re-render to ensure dark mode classes are applied
-    setTimeout(() => {
-      if (state.darkMode) {
-        document.documentElement.classList.remove('dark');
-      } else {
-        document.documentElement.classList.add('dark');
-      }
-    }, 0);
   };
 
   const handleNavClick = (view, event) => {
@@ -26,6 +18,7 @@ const Header = ({ currentView, onNavigate }) => {
 
   const navigationItems = [
     { id: 'home', label: 'Home', shortcut: 'Ctrl+H' },
+    { id: 'analytics', label: 'Analytics', shortcut: 'Ctrl+D' },
     { id: 'about', label: 'About', shortcut: 'Ctrl+A' },
     { id: 'help', label: 'Help', shortcut: 'Ctrl+K' },
     { id: 'settings', label: 'Settings', shortcut: 'Ctrl+,' }

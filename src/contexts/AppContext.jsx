@@ -1,9 +1,22 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
+// Get initial dark mode from localStorage or system preference
+const getInitialDarkMode = () => {
+  const saved = localStorage.getItem('filealchemy-darkmode');
+  if (saved !== null) {
+    return saved === 'true';
+  }
+  // Check system preference
+  if (typeof window !== 'undefined') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false;
+};
+
 // Initial state
 const initialState = {
   // Theme
-  darkMode: false,
+  darkMode: getInitialDarkMode(),
   
   // Current conversion
   selectedCategory: null,
@@ -156,17 +169,19 @@ const AppContext = createContext();
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Load dark mode preference from localStorage
+  // Initialize dark mode class on first render
   useEffect(() => {
-    const savedDarkMode = localStorage.getItem('filealchemy-darkmode');
-    if (savedDarkMode === 'true') {
-      dispatch({ type: ActionTypes.TOGGLE_DARK_MODE });
+    // Set initial class based on state
+    if (state.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
-  }, []);
+  }, []); // Empty dependency array - runs only once
 
   // Update localStorage and document class when dark mode changes
   useEffect(() => {
-    localStorage.setItem('filealchemy-darkmode', state.darkMode);
+    localStorage.setItem('filealchemy-darkmode', state.darkMode.toString());
     if (state.darkMode) {
       document.documentElement.classList.add('dark');
     } else {

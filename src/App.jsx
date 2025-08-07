@@ -7,7 +7,9 @@ import ConversionPage from './components/ConversionPage';
 import AboutPage from './components/AboutPage';
 import HelpPage from './components/HelpPage';
 import SettingsPage from './components/SettingsPage';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import Notifications from './components/ui/Notifications';
+import PWAInstallPrompt, { PWAServiceWorker } from './components/PWAInstallPrompt';
 
 function App() {
   const [currentView, setCurrentView] = useState('home');
@@ -57,6 +59,10 @@ function App() {
             e.preventDefault();
             handleNavigation('help');
             break;
+          case 'd':
+            e.preventDefault();
+            handleNavigation('analytics');
+            break;
           case ',':
             e.preventDefault();
             handleNavigation('settings');
@@ -83,6 +89,8 @@ function App() {
         return <HelpPage />;
       case 'settings':
         return <SettingsPage history={conversionHistory} onClearHistory={() => setConversionHistory([])} />;
+      case 'analytics':
+        return <AnalyticsDashboard history={conversionHistory} />;
       default:
         return <HomePage onCategorySelect={handleCategorySelect} />;
     }
@@ -94,6 +102,7 @@ function App() {
         <Header currentView={currentView} onNavigate={handleNavigation} />
         
         <main className="flex-1">
+          <PWAInstallPrompt />
           {renderCurrentView()}
         </main>
         
@@ -101,6 +110,9 @@ function App() {
         
         {/* Global Notifications */}
         <Notifications />
+        
+        {/* PWA Service Worker */}
+        <PWAServiceWorker />
       </div>
     </AppProvider>
   );

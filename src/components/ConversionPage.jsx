@@ -6,6 +6,8 @@ import Button from './ui/Button';
 import Card from './ui/Card';
 import Breadcrumb from './ui/Breadcrumb';
 import FileUpload from './FileUpload';
+import FilePreview from './FilePreview';
+import ConversionPresets from './ConversionPresets';
 import ConversionProgress from './ConversionProgress';
 import ConversionResults from './ConversionResults';
 
@@ -92,6 +94,9 @@ const ConversionPage = ({ onBack, onComplete }) => {
           </div>
         </div>
 
+        {/* Conversion Presets */}
+        <ConversionPresets />
+
         {/* Conversion Setup */}
         <div className="space-y-8">
           {/* Format Selection */}
@@ -169,6 +174,11 @@ const ConversionPage = ({ onBack, onComplete }) => {
               </h2>
               <FileUpload />
             </Card>
+          )}
+
+          {/* File Preview */}
+          {state.selectedFiles.length > 0 && (
+            <FilePreview />
           )}
 
           {/* Convert Button */}
