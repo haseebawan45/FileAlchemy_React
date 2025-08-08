@@ -108,18 +108,22 @@ function App() {
   return (
     <AppProvider>
       <div className="min-h-screen flex flex-col">
-        <Header currentView={currentView} onNavigate={handleNavigation} user={user} />
-        
+        {/* Hide Header on auth pages (signin/signup) */}
+        {currentView !== 'auth' && (
+          <Header currentView={currentView} onNavigate={handleNavigation} user={user} />
+        )}
+
         <main className="flex-1">
           <PWAInstallPrompt />
           {renderCurrentView()}
         </main>
-        
-        <Footer />
-        
+
+        {/* Hide Footer on auth pages (signin/signup) */}
+        {currentView !== 'auth' && <Footer />}
+
         {/* Global Notifications */}
         <Notifications />
-        
+
         {/* PWA Service Worker */}
         <PWAServiceWorker />
       </div>
