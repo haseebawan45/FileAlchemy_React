@@ -25,7 +25,10 @@ export function useConversion() {
     try {
       setError(null);
       dispatch({ type: actions.START_CONVERSION });
-      
+
+      // Scroll to top when conversion starts
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
       // Add notification for conversion start
       dispatch({
         type: actions.ADD_NOTIFICATION,
@@ -42,19 +45,19 @@ export function useConversion() {
         state.sourceFormat,
         state.targetFormat,
         (progress, status) => {
-          dispatch({ 
-            type: actions.UPDATE_PROGRESS, 
-            payload: { progress } 
+          dispatch({
+            type: actions.UPDATE_PROGRESS,
+            payload: { progress }
           });
         }
       );
 
       if (result.success) {
-        dispatch({ 
-          type: actions.COMPLETE_CONVERSION, 
-          payload: { results: result.results } 
+        dispatch({
+          type: actions.COMPLETE_CONVERSION,
+          payload: { results: result.results }
         });
-        
+
         // Add success notification
         dispatch({
           type: actions.ADD_NOTIFICATION,
@@ -69,11 +72,11 @@ export function useConversion() {
       }
     } catch (err) {
       setError(err.message);
-      dispatch({ 
-        type: actions.COMPLETE_CONVERSION, 
-        payload: { results: [] } 
+      dispatch({
+        type: actions.COMPLETE_CONVERSION,
+        payload: { results: [] }
       });
-      
+
       // Add error notification
       dispatch({
         type: actions.ADD_NOTIFICATION,
@@ -89,7 +92,7 @@ export function useConversion() {
   const addFiles = useCallback((newFiles) => {
     const fileArray = Array.from(newFiles);
     const previews = generatePreviewUrls(fileArray);
-    
+
     dispatch({
       type: actions.ADD_FILES,
       payload: { files: fileArray, previews }
@@ -99,7 +102,7 @@ export function useConversion() {
   const setFiles = useCallback((files) => {
     const fileArray = Array.from(files);
     const previews = generatePreviewUrls(fileArray);
-    
+
     dispatch({
       type: actions.SET_FILES,
       payload: { files: fileArray, previews }
@@ -111,7 +114,7 @@ export function useConversion() {
     if (state.previewUrls[index]) {
       URL.revokeObjectURL(state.previewUrls[index]);
     }
-    
+
     dispatch({
       type: actions.REMOVE_FILE,
       payload: { index }
@@ -123,7 +126,7 @@ export function useConversion() {
     state.previewUrls.forEach(url => {
       if (url) URL.revokeObjectURL(url);
     });
-    
+
     dispatch({ type: actions.CLEAR_FILES });
     setError(null);
   }, [dispatch, actions, state.previewUrls]);
@@ -141,7 +144,7 @@ export function useConversion() {
     state.previewUrls.forEach(url => {
       if (url) URL.revokeObjectURL(url);
     });
-    
+
     dispatch({ type: actions.RESET_CONVERSION });
     setError(null);
   }, [dispatch, actions, state.previewUrls]);
@@ -151,7 +154,7 @@ export function useConversion() {
     state.previewUrls.forEach(url => {
       if (url) URL.revokeObjectURL(url);
     });
-    
+
     dispatch({ type: actions.RESET_CONVERSION_KEEP_CATEGORY });
     setError(null);
   }, [dispatch, actions, state.previewUrls]);
@@ -165,7 +168,7 @@ export function useConversion() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     dispatch({
       type: actions.ADD_NOTIFICATION,
       payload: {
@@ -190,7 +193,7 @@ export function useConversion() {
     isConverting: state.isConverting,
     progress: state.progress,
     error,
-    
+
     // Actions
     convertFiles,
     addFiles,
