@@ -9,6 +9,7 @@ import AboutPage from './components/AboutPage';
 import HelpPage from './components/HelpPage';
 import SettingsPage from './components/SettingsPage';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import UserAnalyticsDashboard from './components/UserAnalyticsDashboard';
 import AuthPage from './components/AuthPage';
 import ContactPage from './components/ContactPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
@@ -23,13 +24,47 @@ function AppContent() {
   const [conversionHistory, setConversionHistory] = useState([]);
   const { user, trackConversion } = useAuth();
 
-  // Load history from localStorage
+  // Load history from localStorage and Firestore
   useEffect(() => {
-    const savedHistory = localStorage.getItem('filealchemy-history');
-    if (savedHistory) {
-      setConversionHistory(JSON.parse(savedHistory));
-    }
-  }, []);
+    const loadHistory = async () => {
+      // Load from localStorage first for immediate display
+      const savedHistory = localStorage.getItem('filealchemy-history');
+      if (savedHistory) {
+        setConversionHistory(JSON.parse(savedHistory));
+      }
+
+      // If user is authenticated, load from Firestore
+      if (user) {
+        try {
+          const { default: firestoreService } = await import('./services/firestoreService');
+          const result = await firestoreService.getUserConversionHistory(user.uid, 20);
+          
+          if (result.success && result.data.length > 0) {
+            // Convert Firestore data to local format for backward compatibility
+            const firestoreHistory = result.data.map(record => ({
+              id: record.id,
+              timestamp: record.createdAt?.toDate?.()?.getTime() || Date.now(),
+              category: record.category,
+              sourceFormat: record.sourceFormat,
+              targetFormat: record.targetFormat,
+              fileCount: record.totalFiles,
+              success: record.success,
+              // Additional Firestore data
+              firestoreData: record
+            }));
+            
+            // Merge with localStorage data, prioritizing Firestore
+            const mergedHistory = [...firestoreHistory];
+            setConversionHistory(mergedHistory);
+          }
+        } catch (error) {
+          console.error('Error loading Firestore history:', error);
+        }
+      }
+    };
+
+    loadHistory();
+  }, [user]); // Re-run when user changes
 
   // Save history to localStorage
   useEffect(() => {

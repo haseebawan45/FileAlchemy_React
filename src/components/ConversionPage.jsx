@@ -30,16 +30,22 @@ const ConversionPage = ({ onBack, onComplete, onNavigate }) => {
   const canConvert = state.selectedFiles.length > 0 && state.sourceFormat && state.targetFormat && !state.isConverting;
 
   const handleConvert = async () => {
-    await convertFiles();
+    const result = await convertFiles();
+    
     // Add to history when conversion completes
     if (onComplete) {
-      onComplete({
+      const historyData = {
         category: state.selectedCategory,
         sourceFormat: state.sourceFormat,
         targetFormat: state.targetFormat,
         fileCount: state.selectedFiles.length,
-        timestamp: Date.now()
-      });
+        timestamp: Date.now(),
+        success: state.conversionResults.length > 0 && state.conversionResults.some(r => r.success),
+        // Include conversion data if available
+        conversionData: result?.conversionData
+      };
+      
+      onComplete(historyData);
     }
   };
 

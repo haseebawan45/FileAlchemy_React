@@ -21,7 +21,7 @@ export function useConversion() {
   const convertFiles = useCallback(async () => {
     if (!state.selectedFiles.length || !state.sourceFormat || !state.targetFormat) {
       setError('Please select files and conversion formats');
-      return;
+      return null;
     }
 
     try {
@@ -60,8 +60,11 @@ export function useConversion() {
           payload: { results: result.results }
         });
 
-        // Track conversion for authenticated users
-        if (user) {
+        // Track conversion for authenticated users with detailed data
+        if (user && result.conversionData) {
+          await trackConversion(result.conversionData);
+        } else if (user) {
+          // Fallback for backward compatibility
           await trackConversion({
             sourceFormat: state.sourceFormat,
             targetFormat: state.targetFormat,
@@ -80,6 +83,9 @@ export function useConversion() {
             title: 'Conversion Complete!'
           }
         });
+
+        // Return the result so ConversionPage can access conversionData
+        return result;
       } else {
         throw new Error(result.message || 'Conversion failed');
       }
@@ -90,6 +96,30 @@ export function useConversion() {
         payload: { results: [] }
       });
 
+      // Track failed conversion for authenticated users
+      if (user) {
+        const errorConversionData = err.conversionData || {
+          sourceFormat: state.sourceFormat,
+          targetFormat: state.targetFormat,
+          category: state.selectedCategory,
+          files: state.selectedFiles,
+          success: false,
+          successfulFiles: 0,
+          failedFiles: state.selectedFiles.length,
+          startTime: new Date(),
+          endTime: new Date(),
+          processingTimeMs: 0,
+          backendUsed: 'unknown',
+          errorMessage: err.message
+        };
+        
+        try {
+          await trackConversion(errorConversionData);
+        } catch (trackError) {
+          console.error('Error tracking failed conversion:', trackError);
+        }
+      }
+
       // Add error notification
       dispatch({
         type: actions.ADD_NOTIFICATION,
@@ -99,8 +129,11 @@ export function useConversion() {
           title: 'Conversion Failed'
         }
       });
+
+      // Return error result with conversionData for tracking
+      return { success: false, conversionData: err.conversionData };
     }
-  }, [state.selectedFiles, state.sourceFormat, state.targetFormat, dispatch, actions]);
+  }, [state.selectedFiles, state.sourceFormat, state.targetFormat, state.selectedCategory, dispatch, actions, user, trackConversion]);
 
   const addFiles = useCallback((newFiles) => {
     const fileArray = Array.from(newFiles);
