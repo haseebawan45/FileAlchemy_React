@@ -33,7 +33,7 @@ function App() {
     localStorage.setItem('filealchemy-history', JSON.stringify(conversionHistory));
   }, [conversionHistory]);
 
-  const handleCategorySelect = (category) => {
+  const handleCategorySelect = () => {
     setCurrentView('conversion');
   };
 
