@@ -1,6 +1,18 @@
 import React from 'react';
 
-const Footer = () => {
+const Footer = ({ onNavigate, onCategorySelect }) => {
+  const handleCategoryNavigation = (category) => {
+    if (onCategorySelect) {
+      onCategorySelect(category);
+    }
+  };
+
+  const handlePageNavigation = (page) => {
+    if (onNavigate) {
+      onNavigate(page);
+    }
+  };
+
   return (
     <footer className="bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -22,10 +34,38 @@ const Footer = () => {
               Features
             </h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Image Conversion</a></li>
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Document Processing</a></li>
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Video & Audio</a></li>
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Archive Tools</a></li>
+              <li>
+                <button 
+                  onClick={() => handleCategoryNavigation('images')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Image Conversion
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleCategoryNavigation('documents')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Document Processing
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleCategoryNavigation('video')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Video & Audio
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleCategoryNavigation('archives')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Archive Tools
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -35,10 +75,38 @@ const Footer = () => {
               Support
             </h4>
             <ul className="space-y-2 text-sm">
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Help Center</a></li>
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Contact Us</a></li>
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Privacy Policy</a></li>
-              <li><a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-500">Terms of Service</a></li>
+              <li>
+                <button 
+                  onClick={() => handlePageNavigation('help')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Help Center
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handlePageNavigation('contact')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Contact Us
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handlePageNavigation('privacy')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Privacy Policy
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handlePageNavigation('terms')}
+                  className="text-gray-600 dark:text-gray-400 hover:text-primary-500 transition-colors"
+                >
+                  Terms of Service
+                </button>
+              </li>
             </ul>
           </div>
         </div>

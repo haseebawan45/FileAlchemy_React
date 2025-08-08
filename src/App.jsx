@@ -9,6 +9,9 @@ import HelpPage from './components/HelpPage';
 import SettingsPage from './components/SettingsPage';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import AuthPage from './components/AuthPage';
+import ContactPage from './components/ContactPage';
+import PrivacyPolicyPage from './components/PrivacyPolicyPage';
+import TermsOfServicePage from './components/TermsOfServicePage';
 import Notifications from './components/ui/Notifications';
 import PWAInstallPrompt, { PWAServiceWorker } from './components/PWAInstallPrompt';
 
@@ -100,6 +103,12 @@ function App() {
         return <AnalyticsDashboard history={conversionHistory} />;
       case 'auth':
         return <AuthPage onSuccess={handleAuthSuccess} onBack={() => handleNavigation('home')} />;
+      case 'contact':
+        return <ContactPage />;
+      case 'privacy':
+        return <PrivacyPolicyPage />;
+      case 'terms':
+        return <TermsOfServicePage />;
       default:
         return <HomePage onCategorySelect={handleCategorySelect} />;
     }
@@ -119,7 +128,7 @@ function App() {
         </main>
 
         {/* Hide Footer on auth pages (signin/signup) */}
-        {currentView !== 'auth' && <Footer />}
+        {currentView !== 'auth' && <Footer onNavigate={handleNavigation} onCategorySelect={handleCategorySelect} />}
 
         {/* Global Notifications */}
         <Notifications />
