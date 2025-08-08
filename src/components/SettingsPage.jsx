@@ -1,59 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../contexts/AppContext';
 import Card from './ui/Card';
 import Button from './ui/Button';
-import BackendStatus from './ui/BackendStatus';
-import { ConversionApi, SmartConversionService } from '../services/conversionApi';
 
 const SettingsPage = ({ history, onClearHistory }) => {
   const { state, dispatch, actions } = useApp();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [backendFormats, setBackendFormats] = useState(null);
-  const [backendHealth, setBackendHealth] = useState(null);
-  const [testingBackend, setTestingBackend] = useState(false);
-
-  useEffect(() => {
-    checkBackendStatus();
-  }, []);
-
-  const checkBackendStatus = async () => {
-    try {
-      const health = await ConversionApi.checkHealth();
-      setBackendHealth(health);
-
-      const formats = await SmartConversionService.getSupportedFormats();
-      setBackendFormats(formats);
-    } catch (error) {
-      setBackendHealth({ status: 'unavailable', error: error.message });
-      setBackendFormats(null);
-    }
-  };
-
-  const testBackendConnection = async () => {
-    setTestingBackend(true);
-    try {
-      await checkBackendStatus();
-      dispatch({
-        type: actions.ADD_NOTIFICATION,
-        payload: {
-          type: 'success',
-          title: 'Backend Test',
-          message: 'Successfully connected to backend server!'
-        }
-      });
-    } catch (error) {
-      dispatch({
-        type: actions.ADD_NOTIFICATION,
-        payload: {
-          type: 'error',
-          title: 'Backend Test Failed',
-          message: error.message
-        }
-      });
-    } finally {
-      setTestingBackend(false);
-    }
-  };
 
   const preferences = [
     {
@@ -154,108 +106,7 @@ const SettingsPage = ({ history, onClearHistory }) => {
             </div>
           </Card>
 
-          {/* Backend Configuration */}
-          <Card className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-                Backend Configuration
-              </h2>
-              <BackendStatus />
-            </div>
 
-            <div className="space-y-6">
-              {/* Backend Status */}
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">
-                    Connection Status
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {backendHealth?.status === 'healthy'
-                      ? 'Connected to Python backend for real file conversion'
-                      : 'Using client-side mock conversion (demo mode)'
-                    }
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={testBackendConnection}
-                  disabled={testingBackend}
-                >
-                  {testingBackend ? 'Testing...' : 'Test Connection'}
-                </Button>
-              </div>
-
-              {/* Backend URL */}
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">
-                    Backend URL
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    API endpoint for file conversion
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm text-gray-900 dark:text-white">
-                    http://localhost:5000
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Default development server
-                  </div>
-                </div>
-              </div>
-
-              {/* Supported Formats */}
-              {backendFormats && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                  <h3 className="font-medium text-gray-900 dark:text-white mb-4">
-                    Backend Supported Formats
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(backendFormats).map(([category, formats]) => (
-                      <div key={category} className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl">
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-2 capitalize">
-                          {category}
-                        </h4>
-                        <div className="space-y-1 text-sm">
-                          <div className="text-gray-600 dark:text-gray-400">
-                            <span className="font-medium">Input:</span> {formats.input?.join(', ') || 'None'}
-                          </div>
-                          <div className="text-gray-600 dark:text-gray-400">
-                            <span className="font-medium">Output:</span> {formats.output?.join(', ') || 'None'}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Backend Setup Instructions */}
-              {!backendHealth || backendHealth.status !== 'healthy' && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl">
-                    <h3 className="font-medium text-blue-900 dark:text-blue-300 mb-2">
-                      🚀 Enable Real File Conversion
-                    </h3>
-                    <p className="text-sm text-blue-800 dark:text-blue-400 mb-3">
-                      To use real file conversion instead of demo mode, start the Python backend:
-                    </p>
-                    <div className="bg-blue-100 dark:bg-blue-900/40 p-3 rounded-lg font-mono text-sm text-blue-900 dark:text-blue-300">
-                      <div>cd backend</div>
-                      <div>python setup.py</div>
-                      <div>python api_server.py</div>
-                    </div>
-                    <p className="text-xs text-blue-700 dark:text-blue-400 mt-2">
-                      See BACKEND_INTEGRATION.md for detailed setup instructions
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
 
           {/* Conversion History */}
           <Card className="p-6">
