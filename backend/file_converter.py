@@ -980,6 +980,471 @@ class ArchiveConverter(BaseConverter):
             
         return formats
 
+class DataConverter(BaseConverter):
+    """Handle data file conversions (CSV, XLSX, JSON, etc.)"""
+    
+    def __init__(self):
+        self.available_libs = {}
+        
+        # Check for pandas (for CSV/Excel operations)
+        try:
+            import pandas as pd
+            self.available_libs['pandas'] = True
+        except ImportError:
+            self.available_libs['pandas'] = False
+            
+        # Check for openpyxl (for Excel files)
+        try:
+            import openpyxl
+            self.available_libs['openpyxl'] = True
+        except ImportError:
+            self.available_libs['openpyxl'] = False
+            
+        # Check for reportlab (for PDF creation)
+        try:
+            from reportlab.pdfgen import canvas
+            self.available_libs['reportlab'] = True
+        except ImportError:
+            self.available_libs['reportlab'] = False
+    
+    def convert(self, input_path: str, output_path: str, **kwargs) -> bool:
+        input_ext = Path(input_path).suffix.lower()
+        output_ext = Path(output_path).suffix.lower()
+        
+        # CSV conversions
+        if input_ext == '.csv' and output_ext == '.xlsx':
+            return self._csv_to_xlsx(input_path, output_path, **kwargs)
+        elif input_ext == '.csv' and output_ext == '.pdf':
+            return self._csv_to_pdf(input_path, output_path, **kwargs)
+        elif input_ext == '.csv' and output_ext == '.txt':
+            return self._csv_to_txt(input_path, output_path, **kwargs)
+        elif input_ext == '.csv' and output_ext == '.json':
+            return self._csv_to_json(input_path, output_path, **kwargs)
+        
+        # XLSX conversions
+        elif input_ext == '.xlsx' and output_ext == '.csv':
+            return self._xlsx_to_csv(input_path, output_path, **kwargs)
+        elif input_ext == '.xlsx' and output_ext == '.pdf':
+            return self._xlsx_to_pdf(input_path, output_path, **kwargs)
+        elif input_ext == '.xlsx' and output_ext == '.txt':
+            return self._xlsx_to_txt(input_path, output_path, **kwargs)
+        
+        # JSON conversions
+        elif input_ext == '.json' and output_ext == '.csv':
+            return self._json_to_csv(input_path, output_path, **kwargs)
+        elif input_ext == '.json' and output_ext == '.xlsx':
+            return self._json_to_xlsx(input_path, output_path, **kwargs)
+        elif input_ext == '.json' and output_ext == '.txt':
+            return self._json_to_txt(input_path, output_path, **kwargs)
+        
+        # XML conversions (basic support)
+        elif input_ext == '.xml' and output_ext == '.json':
+            return self._xml_to_json(input_path, output_path, **kwargs)
+        elif input_ext == '.xml' and output_ext == '.txt':
+            return self._xml_to_txt(input_path, output_path, **kwargs)
+        
+        return False
+    
+    def _csv_to_xlsx(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert CSV to Excel (XLSX)"""
+        print(f"Starting CSV to XLSX conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['pandas']:
+            print("pandas not available for CSV processing")
+            return False
+            
+        try:
+            import pandas as pd
+            
+            # Read CSV file
+            df = pd.read_csv(input_path, encoding='utf-8')
+            
+            # Write to Excel
+            with pd.ExcelWriter(output_path, engine='openpyxl' if self.available_libs['openpyxl'] else 'xlsxwriter') as writer:
+                df.to_excel(writer, sheet_name='Sheet1', index=False)
+            
+            print(f"Successfully converted CSV to XLSX: {len(df)} rows, {len(df.columns)} columns")
+            return True
+            
+        except Exception as e:
+            print(f"CSV to XLSX conversion failed: {e}")
+            return False
+    
+    def _csv_to_pdf(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert CSV to PDF table"""
+        print(f"Starting CSV to PDF conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['pandas']:
+            print("pandas not available for CSV processing")
+            return False
+            
+        if not self.available_libs['reportlab']:
+            print("reportlab not available for PDF creation")
+            return False
+            
+        try:
+            import pandas as pd
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib import colors
+            from reportlab.lib.units import inch
+            
+            # Read CSV file
+            df = pd.read_csv(input_path, encoding='utf-8')
+            
+            # Create PDF document
+            pdf_doc = SimpleDocTemplate(
+                output_path,
+                pagesize=A4,
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=18
+            )
+            
+            # Get styles
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Add title
+            filename = Path(input_path).stem
+            title = Paragraph(f"Data Table: {filename}", styles['Title'])
+            story.append(title)
+            story.append(Spacer(1, 20))
+            
+            # Prepare table data
+            # Convert DataFrame to list of lists for ReportLab
+            table_data = []
+            
+            # Add headers
+            headers = list(df.columns)
+            table_data.append(headers)
+            
+            # Add data rows (limit to prevent huge PDFs)
+            max_rows = kwargs.get('max_rows', 100)  # Default limit
+            for i, row in df.iterrows():
+                if i >= max_rows:
+                    break
+                # Convert all values to strings and handle NaN
+                row_data = [str(val) if pd.notna(val) else '' for val in row.values]
+                table_data.append(row_data)
+            
+            # Create table
+            table = Table(table_data)
+            
+            # Style the table
+            table.setStyle(TableStyle([
+                # Header styling
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                
+                # Data styling
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                
+                # Alternating row colors
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.beige, colors.white]),
+            ]))
+            
+            story.append(table)
+            
+            # Add summary info
+            if len(df) > max_rows:
+                story.append(Spacer(1, 20))
+                summary = Paragraph(f"Note: Showing first {max_rows} rows of {len(df)} total rows", styles['Normal'])
+                story.append(summary)
+            
+            # Build PDF
+            pdf_doc.build(story)
+            
+            print(f"Successfully converted CSV to PDF: {len(df)} rows, {len(df.columns)} columns")
+            return True
+            
+        except Exception as e:
+            print(f"CSV to PDF conversion failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _csv_to_txt(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert CSV to formatted text"""
+        print(f"Starting CSV to TXT conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['pandas']:
+            # Fallback to simple CSV reading
+            try:
+                import csv
+                
+                with open(input_path, 'r', encoding='utf-8') as csvfile:
+                    reader = csv.reader(csvfile)
+                    
+                    with open(output_path, 'w', encoding='utf-8') as txtfile:
+                        for row in reader:
+                            txtfile.write('\t'.join(row) + '\n')
+                
+                print("Successfully converted CSV to TXT using basic CSV reader")
+                return True
+                
+            except Exception as e:
+                print(f"CSV to TXT conversion failed: {e}")
+                return False
+        
+        try:
+            import pandas as pd
+            
+            # Read CSV file
+            df = pd.read_csv(input_path, encoding='utf-8')
+            
+            # Convert to formatted text
+            with open(output_path, 'w', encoding='utf-8') as f:
+                # Write header
+                f.write("Data Table: " + Path(input_path).stem + "\n")
+                f.write("=" * 50 + "\n\n")
+                
+                # Write data in a readable format
+                f.write(df.to_string(index=False))
+                
+                # Write summary
+                f.write(f"\n\nSummary: {len(df)} rows, {len(df.columns)} columns")
+            
+            print(f"Successfully converted CSV to TXT: {len(df)} rows, {len(df.columns)} columns")
+            return True
+            
+        except Exception as e:
+            print(f"CSV to TXT conversion failed: {e}")
+            return False
+    
+    def _csv_to_json(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert CSV to JSON"""
+        print(f"Starting CSV to JSON conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['pandas']:
+            # Fallback to basic CSV/JSON
+            try:
+                import csv
+                import json
+                
+                data = []
+                with open(input_path, 'r', encoding='utf-8') as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    for row in reader:
+                        data.append(row)
+                
+                with open(output_path, 'w', encoding='utf-8') as jsonfile:
+                    json.dump(data, jsonfile, indent=2, ensure_ascii=False)
+                
+                print(f"Successfully converted CSV to JSON: {len(data)} records")
+                return True
+                
+            except Exception as e:
+                print(f"CSV to JSON conversion failed: {e}")
+                return False
+        
+        try:
+            import pandas as pd
+            
+            # Read CSV file
+            df = pd.read_csv(input_path, encoding='utf-8')
+            
+            # Convert to JSON
+            df.to_json(output_path, orient='records', indent=2, force_ascii=False)
+            
+            print(f"Successfully converted CSV to JSON: {len(df)} records")
+            return True
+            
+        except Exception as e:
+            print(f"CSV to JSON conversion failed: {e}")
+            return False
+    
+    def _xlsx_to_csv(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert Excel (XLSX) to CSV"""
+        print(f"Starting XLSX to CSV conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['pandas']:
+            print("pandas not available for XLSX processing")
+            return False
+            
+        try:
+            import pandas as pd
+            
+            # Read Excel file (first sheet by default)
+            sheet_name = kwargs.get('sheet_name', 0)  # Default to first sheet
+            df = pd.read_excel(input_path, sheet_name=sheet_name)
+            
+            # Write to CSV
+            df.to_csv(output_path, index=False, encoding='utf-8')
+            
+            print(f"Successfully converted XLSX to CSV: {len(df)} rows, {len(df.columns)} columns")
+            return True
+            
+        except Exception as e:
+            print(f"XLSX to CSV conversion failed: {e}")
+            return False
+    
+    def _xlsx_to_pdf(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert Excel (XLSX) to PDF"""
+        print(f"Starting XLSX to PDF conversion: {input_path} -> {output_path}")
+        
+        # First convert to CSV, then CSV to PDF
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as temp_file:
+            temp_csv_path = temp_file.name
+        
+        try:
+            # Convert XLSX to CSV first
+            if not self._xlsx_to_csv(input_path, temp_csv_path, **kwargs):
+                return False
+            
+            # Then convert CSV to PDF
+            result = self._csv_to_pdf(temp_csv_path, output_path, **kwargs)
+            
+            return result
+            
+        finally:
+            # Cleanup temp file
+            import os
+            try:
+                os.unlink(temp_csv_path)
+            except:
+                pass
+    
+    def _xlsx_to_txt(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert Excel (XLSX) to text"""
+        print(f"Starting XLSX to TXT conversion: {input_path} -> {output_path}")
+        
+        # First convert to CSV, then CSV to TXT
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as temp_file:
+            temp_csv_path = temp_file.name
+        
+        try:
+            # Convert XLSX to CSV first
+            if not self._xlsx_to_csv(input_path, temp_csv_path, **kwargs):
+                return False
+            
+            # Then convert CSV to TXT
+            result = self._csv_to_txt(temp_csv_path, output_path, **kwargs)
+            
+            return result
+            
+        finally:
+            # Cleanup temp file
+            import os
+            try:
+                os.unlink(temp_csv_path)
+            except:
+                pass
+    
+    def _json_to_csv(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert JSON to CSV"""
+        print(f"Starting JSON to CSV conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['pandas']:
+            # Fallback to basic JSON/CSV
+            try:
+                import json
+                import csv
+                
+                with open(input_path, 'r', encoding='utf-8') as jsonfile:
+                    data = json.load(jsonfile)
+                
+                # Handle different JSON structures
+                if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+                    # List of dictionaries - standard tabular data
+                    fieldnames = data[0].keys()
+                    
+                    with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+                        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                        writer.writeheader()
+                        writer.writerows(data)
+                    
+                    print(f"Successfully converted JSON to CSV: {len(data)} records")
+                    return True
+                else:
+                    print("JSON structure not suitable for CSV conversion")
+                    return False
+                    
+            except Exception as e:
+                print(f"JSON to CSV conversion failed: {e}")
+                return False
+        
+        try:
+            import pandas as pd
+            
+            # Read JSON file
+            df = pd.read_json(input_path)
+            
+            # Write to CSV
+            df.to_csv(output_path, index=False, encoding='utf-8')
+            
+            print(f"Successfully converted JSON to CSV: {len(df)} rows, {len(df.columns)} columns")
+            return True
+            
+        except Exception as e:
+            print(f"JSON to CSV conversion failed: {e}")
+            return False
+    
+    def _json_to_xlsx(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert JSON to Excel (XLSX)"""
+        print(f"Starting JSON to XLSX conversion: {input_path} -> {output_path}")
+        
+        # First convert to CSV, then CSV to XLSX
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8') as temp_file:
+            temp_csv_path = temp_file.name
+        
+        try:
+            # Convert JSON to CSV first
+            if not self._json_to_csv(input_path, temp_csv_path, **kwargs):
+                return False
+            
+            # Then convert CSV to XLSX
+            result = self._csv_to_xlsx(temp_csv_path, output_path, **kwargs)
+            
+            return result
+            
+        finally:
+            # Cleanup temp file
+            import os
+            try:
+                os.unlink(temp_csv_path)
+            except:
+                pass
+    
+    def supported_formats(self) -> Dict[str, List[str]]:
+        formats = {'input': [], 'output': []}
+        
+        if self.available_libs['pandas']:
+            # CSV support
+            formats['input'].extend(['csv'])
+            formats['output'].extend(['txt', 'json'])
+            
+            if self.available_libs['openpyxl']:
+                formats['input'].extend(['xlsx'])
+                formats['output'].extend(['csv', 'xlsx'])
+            
+            if self.available_libs['reportlab']:
+                formats['output'].extend(['pdf'])
+        
+        # JSON support (always available)
+        formats['input'].extend(['json'])
+        if self.available_libs['pandas']:
+            formats['output'].extend(['csv'])
+        
+        # Remove duplicates
+        formats['input'] = list(set(formats['input']))
+        formats['output'] = list(set(formats['output']))
+        
+        return formats
+
 class FileConversionService:
     """Main service class that orchestrates all converters"""
     
@@ -988,7 +1453,8 @@ class FileConversionService:
             'image': ImageConverter(),
             'document': DocumentConverter(),
             'media': MediaConverter(),
-            'archive': ArchiveConverter()
+            'archive': ArchiveConverter(),
+            'data': DataConverter()
         }
     
     def convert_file(self, input_path: str, output_path: str, **kwargs) -> bool:

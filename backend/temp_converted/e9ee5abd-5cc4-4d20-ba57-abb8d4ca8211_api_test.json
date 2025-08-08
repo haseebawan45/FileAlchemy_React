@@ -1,0 +1,32 @@
+[
+  {
+    "Product":"Laptop",
+    "Price":999.99,
+    "Category":"Electronics",
+    "Stock":25
+  },
+  {
+    "Product":"Mouse",
+    "Price":29.99,
+    "Category":"Electronics",
+    "Stock":150
+  },
+  {
+    "Product":"Keyboard",
+    "Price":79.99,
+    "Category":"Electronics",
+    "Stock":75
+  },
+  {
+    "Product":"Monitor",
+    "Price":299.99,
+    "Category":"Electronics",
+    "Stock":40
+  },
+  {
+    "Product":"Headphones",
+    "Price":149.99,
+    "Category":"Electronics",
+    "Stock":60
+  }
+]

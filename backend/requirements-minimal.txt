@@ -18,5 +18,9 @@ reportlab>=3.6.0
 # HTML parsing (optional, improves HTML to text conversion)
 beautifulsoup4>=4.12.0
 
+# Data processing (CSV, Excel, JSON)
+pandas>=2.0.0
+openpyxl>=3.1.0
+
 # Archive handling (built-in Python libraries used by default)
 # py7zr and rarfile are optional and loaded dynamically

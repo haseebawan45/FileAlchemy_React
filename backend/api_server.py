@@ -28,7 +28,8 @@ ALLOWED_EXTENSIONS = {
     'documents': {'pdf', 'docx', 'txt', 'html', 'rtf', 'xlsx', 'csv', 'pptx', 'odt', 'ods', 'odp'},
     'video': {'mp4', 'avi', 'mov', 'mkv', 'wmv', 'webm', 'flv'},
     'audio': {'mp3', 'wav', 'flac', 'aac', 'ogg'},
-    'archives': {'zip', 'rar', '7z', 'tar', 'gz'}
+    'archives': {'zip', 'rar', '7z', 'tar', 'gz'},
+    'data': {'json', 'xml', 'yaml', 'yml'}
 }
 
 # Create directories
