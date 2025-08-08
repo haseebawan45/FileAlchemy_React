@@ -1,49 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
-
-// Mock API delay simulation
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Mock conversion API
-async function mockConvertFiles(files, sourceFormat, targetFormat, onProgress) {
-  const results = [];
-  const totalFiles = files.length;
-  
-  for (let i = 0; i < totalFiles; i++) {
-    const file = files[i];
-    
-    // Simulate conversion time based on file size
-    const conversionTime = Math.min(3000, Math.max(1000, file.size / 1000));
-    const progressSteps = 20;
-    const stepTime = conversionTime / progressSteps;
-    
-    // Simulate progress updates
-    for (let step = 1; step <= progressSteps; step++) {
-      await delay(stepTime);
-      const fileProgress = (step / progressSteps) * 100;
-      const totalProgress = ((i * 100) + fileProgress) / totalFiles;
-      onProgress(Math.round(totalProgress));
-    }
-    
-    // Generate mock download URL and converted file info
-    const convertedFileName = file.name.replace(/\.[^/.]+$/, `.${targetFormat.toLowerCase()}`);
-    const mockDownloadUrl = `blob:${window.location.origin}/${Date.now()}-${convertedFileName}`;
-    
-    results.push({
-      originalFile: file,
-      convertedFileName,
-      downloadUrl: mockDownloadUrl,
-      size: Math.round(file.size * (0.7 + Math.random() * 0.6)), // Mock size variation
-      success: Math.random() > 0.05 // 95% success rate
-    });
-  }
-  
-  return {
-    success: true,
-    results: results,
-    message: `Successfully converted ${results.filter(r => r.success).length} of ${totalFiles} files`
-  };
-}
+import SmartConversionService from '../services/conversionApi';
 
 // Generate preview URLs for supported file types
 function generatePreviewUrls(files) {
@@ -79,12 +36,12 @@ export function useConversion() {
         }
       });
 
-      // Mock conversion API call
-      const result = await mockConvertFiles(
+      // Use SmartConversionService (backend with fallback to mock)
+      const result = await SmartConversionService.convertFiles(
         state.selectedFiles,
         state.sourceFormat,
         state.targetFormat,
-        (progress) => {
+        (progress, status) => {
           dispatch({ 
             type: actions.UPDATE_PROGRESS, 
             payload: { progress } 

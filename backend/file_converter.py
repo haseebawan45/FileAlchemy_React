@@ -391,6 +391,7 @@ class ArchiveConverter(BaseConverter):
         if self.available_libs['rarfile']:
             formats['input'].append('rar')
             # Note: rarfile can only extract, not create RAR files
+            # RAR creation requires proprietary WinRAR software
             
         return formats
 

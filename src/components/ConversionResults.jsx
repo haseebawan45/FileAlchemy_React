@@ -86,7 +86,11 @@ const ConversionResults = () => {
 };
 
 const ResultItem = ({ result, onDownload }) => {
-  const { originalFile, convertedFileName, size, success } = result;
+  const { originalFile, convertedFileName, size, success, error } = result;
+  
+  // Handle cases where originalFile might be undefined
+  const originalFileName = originalFile?.name || 'Unknown file';
+  const originalFileSize = originalFile?.size || 0;
   
   return (
     <div className={`flex items-center space-x-4 p-4 rounded-xl border ${
@@ -115,7 +119,7 @@ const ResultItem = ({ result, onDownload }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center space-x-2 mb-1">
           <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-            {originalFile.name}
+            {originalFileName}
           </p>
           <span className="text-gray-400">→</span>
           <p className={`text-sm font-medium truncate ${
@@ -126,17 +130,27 @@ const ResultItem = ({ result, onDownload }) => {
         </div>
         
         <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-          <span>Original: {formatFileSize(originalFile.size)}</span>
+          <span>Original: {formatFileSize(originalFileSize)}</span>
           {success && size && (
             <>
               <span>•</span>
               <span>Converted: {formatFileSize(size)}</span>
+              {originalFileSize > 0 && (
+                <>
+                  <span>•</span>
+                  <span className={`font-medium ${
+                    size < originalFileSize ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'
+                  }`}>
+                    {size < originalFileSize ? 'Smaller' : 'Larger'} ({Math.round(((size - originalFileSize) / originalFileSize) * 100)}%)
+                  </span>
+                </>
+              )}
+            </>
+          )}
+          {!success && error && (
+            <>
               <span>•</span>
-              <span className={`font-medium ${
-                size < originalFile.size ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'
-              }`}>
-                {size < originalFile.size ? 'Smaller' : 'Larger'} ({Math.round(((size - originalFile.size) / originalFile.size) * 100)}%)
-              </span>
+              <span className="text-red-600 dark:text-red-400">{error}</span>
             </>
           )}
         </div>

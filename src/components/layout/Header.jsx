@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import Button from '../ui/Button';
+import BackendStatus from '../ui/BackendStatus';
 
 const Header = ({ currentView, onNavigate, user }) => {
   const { state, dispatch, actions } = useApp();
@@ -62,6 +63,9 @@ const Header = ({ currentView, onNavigate, user }) => {
 
           {/* Right side controls */}
           <div className="flex items-center space-x-2">
+            {/* Backend Status */}
+            <BackendStatus className="hidden sm:inline-flex" />
+            
             {/* User Menu / Auth Button */}
             {user ? (
               <div className="relative mr-2">
