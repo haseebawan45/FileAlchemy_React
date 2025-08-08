@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppProvider } from './contexts/AppContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import HomePage from './components/HomePage';
@@ -16,10 +17,11 @@ import AllFormatsPage from './components/AllFormatsPage';
 import Notifications from './components/ui/Notifications';
 import PWAInstallPrompt, { PWAServiceWorker } from './components/PWAInstallPrompt';
 
-function App() {
+// Main App Content Component that uses Auth Context
+function AppContent() {
   const [currentView, setCurrentView] = useState('home');
   const [conversionHistory, setConversionHistory] = useState([]);
-  const [user, setUser] = useState(null);
+  const { user, trackConversion } = useAuth();
 
   // Load history from localStorage
   useEffect(() => {
@@ -44,12 +46,16 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const addToHistory = (conversion) => {
+  const addToHistory = async (conversion) => {
     setConversionHistory(prev => [conversion, ...prev.slice(0, 9)]); // Keep last 10
+    
+    // Track conversion for authenticated users
+    if (user) {
+      await trackConversion(conversion);
+    }
   };
 
   const handleAuthSuccess = (userData) => {
-    setUser(userData);
     handleNavigation('home');
   };
 
@@ -93,7 +99,7 @@ function App() {
       case 'home':
         return <HomePage onCategorySelect={handleCategorySelect} onNavigate={handleNavigation} />;
       case 'conversion':
-        return <ConversionPage onBack={() => handleNavigation('home')} onComplete={addToHistory} />;
+        return <ConversionPage onBack={() => handleNavigation('home')} onComplete={addToHistory} onNavigate={handleNavigation} />;
       case 'about':
         return <AboutPage />;
       case 'help':
@@ -118,27 +124,36 @@ function App() {
   };
 
   return (
+    <div className="min-h-screen flex flex-col">
+      {/* Hide Header on auth pages (signin/signup) */}
+      {currentView !== 'auth' && (
+        <Header currentView={currentView} onNavigate={handleNavigation} user={user} />
+      )}
+
+      <main className="flex-1">
+        <PWAInstallPrompt />
+        {renderCurrentView()}
+      </main>
+
+      {/* Hide Footer on auth pages (signin/signup) */}
+      {currentView !== 'auth' && <Footer onNavigate={handleNavigation} onCategorySelect={handleCategorySelect} />}
+
+      {/* Global Notifications */}
+      <Notifications />
+
+      {/* PWA Service Worker */}
+      <PWAServiceWorker />
+    </div>
+  );
+}
+
+// Main App Component with Providers
+function App() {
+  return (
     <AppProvider>
-      <div className="min-h-screen flex flex-col">
-        {/* Hide Header on auth pages (signin/signup) */}
-        {currentView !== 'auth' && (
-          <Header currentView={currentView} onNavigate={handleNavigation} user={user} />
-        )}
-
-        <main className="flex-1">
-          <PWAInstallPrompt />
-          {renderCurrentView()}
-        </main>
-
-        {/* Hide Footer on auth pages (signin/signup) */}
-        {currentView !== 'auth' && <Footer onNavigate={handleNavigation} onCategorySelect={handleCategorySelect} />}
-
-        {/* Global Notifications */}
-        <Notifications />
-
-        {/* PWA Service Worker */}
-        <PWAServiceWorker />
-      </div>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </AppProvider>
   );
 }

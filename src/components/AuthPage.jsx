@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import Card from './ui/Card';
 import Button from './ui/Button';
 
@@ -18,6 +19,7 @@ const AuthPage = ({ onSuccess, onBack }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const { dispatch, actions } = useApp();
+  const { signUp, signIn, signInWithGoogle, signInWithFacebook, resetPassword } = useAuth();
 
   const handleInputChange = (e) => {
     setFormData({
@@ -30,81 +32,131 @@ const AuthPage = ({ onSuccess, onBack }) => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (isForgotPassword) {
-      // Handle forgot password submission
-      setTimeout(() => {
-        setIsLoading(false);
+    try {
+      if (isForgotPassword) {
+        // Handle forgot password submission
+        const result = await resetPassword(formData.email);
+        
+        if (result.success) {
+          dispatch({
+            type: actions.ADD_NOTIFICATION,
+            payload: {
+              type: 'success',
+              title: 'Reset Link Sent!',
+              message: `Password reset instructions have been sent to ${formData.email}. Check your inbox and spam folder.`
+            }
+          });
+          // Reset to login form after successful reset email
+          resetToLogin();
+        } else {
+          dispatch({
+            type: actions.ADD_NOTIFICATION,
+            payload: {
+              type: 'error',
+              title: 'Reset Failed',
+              message: result.error
+            }
+          });
+        }
+        return;
+      }
+
+      if (isResetPassword) {
+        // Handle password reset submission (this would typically be handled by Firebase Auth UI)
+        if (formData.newPassword !== formData.confirmNewPassword) {
+          dispatch({
+            type: actions.ADD_NOTIFICATION,
+            payload: {
+              type: 'error',
+              title: 'Password Mismatch',
+              message: 'New passwords do not match. Please try again.'
+            }
+          });
+          return;
+        }
+
+        // In a real app, this would be handled by Firebase Auth's password reset flow
+        dispatch({
+          type: actions.ADD_NOTIFICATION,
+          payload: {
+            type: 'info',
+            title: 'Demo Mode',
+            message: 'Password reset is handled through the email link in production.'
+          }
+        });
+        resetToLogin();
+        return;
+      }
+
+      // Regular login/signup flow
+      let result;
+      
+      if (isSignUp) {
+        // Validate passwords match
+        if (formData.password !== formData.confirmPassword) {
+          dispatch({
+            type: actions.ADD_NOTIFICATION,
+            payload: {
+              type: 'error',
+              title: 'Password Mismatch',
+              message: 'Passwords do not match. Please try again.'
+            }
+          });
+          return;
+        }
+
+        // Sign up with Firebase
+        result = await signUp(formData.email, formData.password, formData.name);
+      } else {
+        // Sign in with Firebase
+        result = await signIn(formData.email, formData.password);
+      }
+
+      if (result.success) {
+        // Show success notification
         dispatch({
           type: actions.ADD_NOTIFICATION,
           payload: {
             type: 'success',
-            title: 'Reset Link Sent!',
-            message: `Password reset instructions have been sent to ${formData.email}. Check your inbox and spam folder.`
+            title: isSignUp ? 'Account Created!' : 'Welcome Back!',
+            message: isSignUp 
+              ? 'Your account has been created successfully. Welcome to FileAlchemy!'
+              : 'You have been signed in successfully.'
           }
         });
-        // Switch to reset password view (simulating email link click)
-        setIsForgotPassword(false);
-        setIsResetPassword(true);
-      }, 1500);
-      return;
-    }
 
-    if (isResetPassword) {
-      // Handle password reset submission
-      if (formData.newPassword !== formData.confirmNewPassword) {
-        setIsLoading(false);
+        // Call success callback with user data
+        if (onSuccess) {
+          onSuccess({
+            email: result.user.email,
+            name: result.user.name,
+            uid: result.user.uid,
+            isSignUp
+          });
+        }
+      } else {
+        // Show error notification
         dispatch({
           type: actions.ADD_NOTIFICATION,
           payload: {
             type: 'error',
-            title: 'Password Mismatch',
-            message: 'New passwords do not match. Please try again.'
+            title: isSignUp ? 'Sign Up Failed' : 'Sign In Failed',
+            message: result.error
           }
         });
-        return;
       }
-
-      setTimeout(() => {
-        setIsLoading(false);
-        dispatch({
-          type: actions.ADD_NOTIFICATION,
-          payload: {
-            type: 'success',
-            title: 'Password Reset Successfully!',
-            message: 'Your password has been updated. You can now sign in with your new password.'
-          }
-        });
-        // Reset to login form
-        resetToLogin();
-      }, 1500);
-      return;
-    }
-
-    // Regular login/signup flow
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Show success notification
+    } catch (error) {
       dispatch({
         type: actions.ADD_NOTIFICATION,
         payload: {
-          type: 'success',
-          title: isSignUp ? 'Account Created!' : 'Welcome Back!',
-          message: isSignUp 
-            ? 'Your account has been created successfully. Welcome to FileAlchemy!'
-            : 'You have been signed in successfully.'
+          type: 'error',
+          title: 'Authentication Error',
+          message: 'An unexpected error occurred. Please try again.'
         }
       });
-
-      // Call success callback
-      if (onSuccess) {
-        onSuccess({
-          email: formData.email || 'demo@filealchemy.com',
-          name: formData.name || 'Demo User',
-          isSignUp
-        });
-      }
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleAuthMode = () => {
@@ -564,16 +616,53 @@ const AuthPage = ({ onSuccess, onBack }) => {
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      dispatch({
-                        type: actions.ADD_NOTIFICATION,
-                        payload: {
-                          type: 'info',
-                          title: 'Demo Mode',
-                          message: 'Social login is not available in demo mode.'
+                    onClick={async () => {
+                      setIsLoading(true);
+                      try {
+                        const result = await signInWithGoogle();
+                        if (result.success) {
+                          dispatch({
+                            type: actions.ADD_NOTIFICATION,
+                            payload: {
+                              type: 'success',
+                              title: 'Welcome!',
+                              message: 'You have been signed in with Google successfully.'
+                            }
+                          });
+                          
+                          if (onSuccess) {
+                            onSuccess({
+                              email: result.user.email,
+                              name: result.user.name,
+                              uid: result.user.uid,
+                              photoURL: result.user.photoURL,
+                              provider: 'google'
+                            });
+                          }
+                        } else {
+                          dispatch({
+                            type: actions.ADD_NOTIFICATION,
+                            payload: {
+                              type: 'error',
+                              title: 'Google Sign In Failed',
+                              message: result.error
+                            }
+                          });
                         }
-                      });
+                      } catch (error) {
+                        dispatch({
+                          type: actions.ADD_NOTIFICATION,
+                          payload: {
+                            type: 'error',
+                            title: 'Authentication Error',
+                            message: 'Failed to sign in with Google. Please try again.'
+                          }
+                        });
+                      } finally {
+                        setIsLoading(false);
+                      }
                     }}
+                    disabled={isLoading}
                     className="w-full text-sm py-2"
                   >
                     <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
@@ -587,24 +676,61 @@ const AuthPage = ({ onSuccess, onBack }) => {
 
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      dispatch({
-                        type: actions.ADD_NOTIFICATION,
-                      payload: {
-                        type: 'info',
-                        title: 'Demo Mode',
-                        message: 'Social login is not available in demo mode.'
+                    onClick={async () => {
+                      setIsLoading(true);
+                      try {
+                        const result = await signInWithFacebook();
+                        if (result.success) {
+                          dispatch({
+                            type: actions.ADD_NOTIFICATION,
+                            payload: {
+                              type: 'success',
+                              title: 'Welcome!',
+                              message: 'You have been signed in with Facebook successfully.'
+                            }
+                          });
+                          
+                          if (onSuccess) {
+                            onSuccess({
+                              email: result.user.email,
+                              name: result.user.name,
+                              uid: result.user.uid,
+                              photoURL: result.user.photoURL,
+                              provider: 'facebook'
+                            });
+                          }
+                        } else {
+                          dispatch({
+                            type: actions.ADD_NOTIFICATION,
+                            payload: {
+                              type: 'error',
+                              title: 'Facebook Sign In Failed',
+                              message: result.error
+                            }
+                          });
+                        }
+                      } catch (error) {
+                        dispatch({
+                          type: actions.ADD_NOTIFICATION,
+                          payload: {
+                            type: 'error',
+                            title: 'Authentication Error',
+                            message: 'Failed to sign in with Facebook. Please try again.'
+                          }
+                        });
+                      } finally {
+                        setIsLoading(false);
                       }
-                    });
-                  }}
-                  className="w-full text-sm py-2"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                  Facebook
-                </Button>
-              </div>
+                    }}
+                    disabled={isLoading}
+                    className="w-full text-sm py-2"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    Facebook
+                  </Button>
+                </div>
             </div>
             )}
 

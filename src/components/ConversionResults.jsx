@@ -1,12 +1,15 @@
 import React from 'react';
 import { useApp } from '../contexts/AppContext';
 import { useConversion } from '../hooks/useConversion';
+import { useAuth } from '../contexts/AuthContext';
 import { isMultiPageConversion } from '../data/conversions';
 import Button from './ui/Button';
 import Card from './ui/Card';
+import AuthBenefits from './ui/AuthBenefits';
 
-const ConversionResults = ({ onNewConversion }) => {
+const ConversionResults = ({ onNewConversion, onNavigate }) => {
   const { state } = useApp();
+  const { user } = useAuth();
   const { downloadResult, downloadAll, resetConversion, resetConversionKeepCategory } = useConversion();
 
   const handleNewConversion = () => {
@@ -100,6 +103,19 @@ const ConversionResults = ({ onNewConversion }) => {
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Auth Benefits - Show after successful conversion to encourage sign up */}
+      {successfulResults.length > 0 && (
+        <div className="mt-6">
+          <AuthBenefits 
+            onSignInClick={() => {
+              if (onNavigate) {
+                onNavigate('auth');
+              }
+            }}
+          />
         </div>
       )}
     </Card>

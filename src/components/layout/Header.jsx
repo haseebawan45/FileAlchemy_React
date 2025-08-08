@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../contexts/AppContext';
+import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
 import BackendStatus from '../ui/BackendStatus';
 
 const Header = ({ currentView, onNavigate, user }) => {
   const { state, dispatch, actions } = useApp();
+  const { signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   
@@ -147,10 +149,30 @@ const Header = ({ currentView, onNavigate, user }) => {
                     
                     <div className="border-t border-gray-200 dark:border-gray-700 py-2">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setUserMenuOpen(false);
-                          // Handle logout
-                          window.location.reload(); // Simple logout - reloads app
+                          try {
+                            const result = await signOut();
+                            if (result.success) {
+                              dispatch({
+                                type: actions.ADD_NOTIFICATION,
+                                payload: {
+                                  type: 'success',
+                                  title: 'Signed Out',
+                                  message: 'You have been signed out successfully.'
+                                }
+                              });
+                            }
+                          } catch (error) {
+                            dispatch({
+                              type: actions.ADD_NOTIFICATION,
+                              payload: {
+                                type: 'error',
+                                title: 'Sign Out Failed',
+                                message: 'Failed to sign out. Please try again.'
+                              }
+                            });
+                          }
                         }}
                         className="flex items-center w-full px-4 py-2 text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                       >

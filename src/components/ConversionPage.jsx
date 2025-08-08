@@ -11,7 +11,7 @@ import ConversionPresets from './ConversionPresets';
 import ConversionProgress from './ConversionProgress';
 import ConversionResults from './ConversionResults';
 
-const ConversionPage = ({ onBack, onComplete }) => {
+const ConversionPage = ({ onBack, onComplete, onNavigate }) => {
   const { state, dispatch, actions } = useApp();
   const { convertFiles, setConversion } = useConversion();
   
@@ -48,7 +48,7 @@ const ConversionPage = ({ onBack, onComplete }) => {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <ConversionProgress />
-          {state.conversionResults.length > 0 && <ConversionResults onNewConversion={onBack} />}
+          {state.conversionResults.length > 0 && <ConversionResults onNewConversion={onBack} onNavigate={onNavigate} />}
         </div>
       </div>
     );

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import SmartConversionService from '../services/conversionApi';
 
 // Generate preview URLs for supported file types
@@ -14,6 +15,7 @@ function generatePreviewUrls(files) {
 
 export function useConversion() {
   const { state, dispatch, actions } = useApp();
+  const { user, trackConversion } = useAuth();
   const [error, setError] = useState(null);
 
   const convertFiles = useCallback(async () => {
@@ -57,6 +59,17 @@ export function useConversion() {
           type: actions.COMPLETE_CONVERSION,
           payload: { results: result.results }
         });
+
+        // Track conversion for authenticated users
+        if (user) {
+          await trackConversion({
+            sourceFormat: state.sourceFormat,
+            targetFormat: state.targetFormat,
+            fileCount: state.selectedFiles.length,
+            timestamp: new Date().toISOString(),
+            success: true
+          });
+        }
 
         // Add success notification
         dispatch({

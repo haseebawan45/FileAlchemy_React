@@ -2,8 +2,11 @@ import React from 'react';
 import { conversionCategories, getConversionsByCategory } from '../data/conversions';
 import { useApp } from '../contexts/AppContext';
 import { useConversion } from '../hooks/useConversion';
+import { useAuth } from '../contexts/AuthContext';
 import Card from './ui/Card';
 import Button from './ui/Button';
+import AuthBenefits from './ui/AuthBenefits';
+import UserStats from './ui/UserStats';
 
 const HomePage = ({ onCategorySelect, onNavigate }) => {
   const { dispatch, actions } = useApp();
@@ -66,6 +69,12 @@ const HomePage = ({ onCategorySelect, onNavigate }) => {
               <div className="text-3xl font-bold text-primary-500 mb-2">⚡</div>
               <div className="text-gray-600 dark:text-gray-400">Lightning Fast</div>
             </div>
+          </div>
+
+          {/* Auth Benefits / User Stats */}
+          <div className="mt-12 max-w-2xl mx-auto">
+            <AuthBenefits onSignInClick={() => onNavigate('auth')} />
+            <UserStats />
           </div>
         </div>
       </section>
