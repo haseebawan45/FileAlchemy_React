@@ -147,6 +147,21 @@ class DocumentConverter(BaseConverter):
             self.available_libs['pdf2docx'] = True
         except ImportError:
             self.available_libs['pdf2docx'] = False
+            
+        # Check for python-docx (for reading DOCX files)
+        try:
+            import docx
+            self.available_libs['python_docx'] = True
+        except ImportError:
+            self.available_libs['python_docx'] = False
+            
+        # Check for reportlab (for creating PDFs)
+        try:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+            self.available_libs['reportlab'] = True
+        except ImportError:
+            self.available_libs['reportlab'] = False
     
     def convert(self, input_path: str, output_path: str, **kwargs) -> bool:
         input_ext = Path(input_path).suffix.lower()
@@ -163,6 +178,10 @@ class DocumentConverter(BaseConverter):
         # PDF to image conversion (multi-page to ZIP)
         elif input_ext == '.pdf' and output_ext in ['.jpg', '.jpeg', '.png']:
             return self._pdf_to_images(input_path, output_path, **kwargs)
+        
+        # DOCX to PDF conversion
+        elif input_ext == '.docx' and output_ext == '.pdf':
+            return self._docx_to_pdf(input_path, output_path, **kwargs)
         
         return False
     
@@ -277,6 +296,90 @@ class DocumentConverter(BaseConverter):
             print(f"PDF to images conversion failed: {e}")
             return False
     
+    def _docx_to_pdf(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert DOCX to PDF using python-docx and reportlab"""
+        print(f"Starting DOCX to PDF conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['python_docx']:
+            print("python-docx not available for DOCX reading")
+            return False
+            
+        if not self.available_libs['reportlab']:
+            print("reportlab not available for PDF creation")
+            return False
+            
+        try:
+            import docx
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.lib.units import inch
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.lib import colors
+            import io
+            
+            # Read DOCX document
+            doc = docx.Document(input_path)
+            
+            # Create PDF document
+            pdf_doc = SimpleDocTemplate(
+                output_path,
+                pagesize=A4,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=18
+            )
+            
+            # Get styles
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Process each paragraph in the DOCX
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():  # Skip empty paragraphs
+                    # Determine style based on paragraph formatting
+                    if paragraph.style.name.startswith('Heading'):
+                        # Use heading style
+                        if '1' in paragraph.style.name:
+                            style = styles['Heading1']
+                        elif '2' in paragraph.style.name:
+                            style = styles['Heading2']
+                        else:
+                            style = styles['Heading3']
+                    else:
+                        # Use normal style
+                        style = styles['Normal']
+                    
+                    # Create paragraph with text
+                    para = Paragraph(paragraph.text, style)
+                    story.append(para)
+                    story.append(Spacer(1, 12))  # Add space between paragraphs
+            
+            # Handle tables if present
+            for table in doc.tables:
+                # Add table content as text (simple approach)
+                story.append(Paragraph("--- Table Content ---", styles['Heading3']))
+                for row in table.rows:
+                    row_text = " | ".join([cell.text for cell in row.cells])
+                    if row_text.strip():
+                        para = Paragraph(row_text, styles['Normal'])
+                        story.append(para)
+                        story.append(Spacer(1, 6))
+                story.append(Spacer(1, 12))
+            
+            # Build PDF
+            pdf_doc.build(story)
+            
+            print(f"Successfully converted DOCX to PDF: {len(doc.paragraphs)} paragraphs, {len(doc.tables)} tables")
+            return True
+            
+        except Exception as e:
+            print(f"DOCX to PDF conversion failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
     def supported_formats(self) -> Dict[str, List[str]]:
         formats = {'input': [], 'output': []}
         if self.available_libs['pymupdf']:
@@ -284,6 +387,9 @@ class DocumentConverter(BaseConverter):
             formats['output'].extend(['txt', 'jpg', 'jpeg', 'png'])  # Added image formats
         if self.available_libs['pdf2docx']:
             formats['output'].extend(['docx'])
+        if self.available_libs['python_docx'] and self.available_libs['reportlab']:
+            formats['input'].extend(['docx'])  # DOCX as input
+            formats['output'].extend(['pdf'])  # PDF as output
         return formats
 
 class MediaConverter(BaseConverter):
