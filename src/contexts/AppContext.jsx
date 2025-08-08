@@ -137,6 +137,18 @@ function appReducer(state, action) {
         conversionResults: []
       };
 
+    case ActionTypes.RESET_CONVERSION_KEEP_CATEGORY:
+      return {
+        ...state,
+        sourceFormat: null,
+        targetFormat: null,
+        selectedFiles: [],
+        previewUrls: [],
+        isConverting: false,
+        progress: 0,
+        conversionResults: []
+      };
+
     case ActionTypes.ADD_NOTIFICATION:
       return {
         ...state,

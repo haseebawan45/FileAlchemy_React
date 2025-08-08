@@ -146,6 +146,16 @@ export function useConversion() {
     setError(null);
   }, [dispatch, actions, state.previewUrls]);
 
+  const resetConversionKeepCategory = useCallback(() => {
+    // Revoke all object URLs
+    state.previewUrls.forEach(url => {
+      if (url) URL.revokeObjectURL(url);
+    });
+    
+    dispatch({ type: actions.RESET_CONVERSION_KEEP_CATEGORY });
+    setError(null);
+  }, [dispatch, actions, state.previewUrls]);
+
   const downloadResult = useCallback((result) => {
     // In a real app, this would handle the actual download
     // For now, we'll simulate it
@@ -189,6 +199,7 @@ export function useConversion() {
     clearFiles,
     setConversion,
     resetConversion,
+    resetConversionKeepCategory,
     downloadResult,
     downloadAll
   };
