@@ -5,9 +5,16 @@ import { isMultiPageConversion } from '../data/conversions';
 import Button from './ui/Button';
 import Card from './ui/Card';
 
-const ConversionResults = () => {
+const ConversionResults = ({ onNewConversion }) => {
   const { state } = useApp();
   const { downloadResult, downloadAll, resetConversion } = useConversion();
+
+  const handleNewConversion = () => {
+    resetConversion();
+    if (onNewConversion) {
+      onNewConversion();
+    }
+  };
   
   if (state.conversionResults.length === 0) return null;
 
@@ -30,7 +37,7 @@ const ConversionResults = () => {
                 Download All
               </Button>
             )}
-            <Button variant="secondary" onClick={resetConversion} size="sm">
+            <Button variant="secondary" onClick={handleNewConversion} size="sm">
               New Conversion
             </Button>
           </div>
