@@ -1,0 +1,22 @@
+# Image conversion
+Pillow>=10.0.0
+pillow-heif>=0.13.0
+
+# Document conversion
+PyMuPDF>=1.23.0
+pdf2docx>=0.5.6
+
+# Optional: Enhanced document conversion
+# pypandoc>=1.11
+
+# Media conversion requires FFmpeg binary to be installed separately
+# ffmpeg-python>=0.2.0
+
+# Archive handling (built into Python standard library)
+# zipfile, tarfile - no additional packages needed
+
+# Optional: OCR capabilities
+# ocrmypdf>=14.0.0
+
+# Optional: SVG conversion
+# cairosvg>=2.7.0
