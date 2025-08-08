@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
@@ -9,6 +9,7 @@ const Header = ({ currentView, onNavigate, user }) => {
   const { signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
   
   const toggleDarkMode = () => {
     dispatch({ type: actions.TOGGLE_DARK_MODE });
@@ -19,6 +20,23 @@ const Header = ({ currentView, onNavigate, user }) => {
     onNavigate(view);
     setMobileMenuOpen(false);
   };
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
 
   const navigationItems = [
     { id: 'home', label: 'Home', shortcut: 'Ctrl+H' },
@@ -70,7 +88,7 @@ const Header = ({ currentView, onNavigate, user }) => {
             
             {/* User Menu / Auth Button */}
             {user ? (
-              <div className="relative mr-2">
+              <div className="relative mr-2" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center space-x-3 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
