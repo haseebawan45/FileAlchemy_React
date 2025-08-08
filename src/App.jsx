@@ -12,6 +12,7 @@ import AuthPage from './components/AuthPage';
 import ContactPage from './components/ContactPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import TermsOfServicePage from './components/TermsOfServicePage';
+import AllFormatsPage from './components/AllFormatsPage';
 import Notifications from './components/ui/Notifications';
 import PWAInstallPrompt, { PWAServiceWorker } from './components/PWAInstallPrompt';
 
@@ -90,7 +91,7 @@ function App() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'home':
-        return <HomePage onCategorySelect={handleCategorySelect} />;
+        return <HomePage onCategorySelect={handleCategorySelect} onNavigate={handleNavigation} />;
       case 'conversion':
         return <ConversionPage onBack={() => handleNavigation('home')} onComplete={addToHistory} />;
       case 'about':
@@ -109,6 +110,8 @@ function App() {
         return <PrivacyPolicyPage />;
       case 'terms':
         return <TermsOfServicePage />;
+      case 'formats':
+        return <AllFormatsPage onCategorySelect={handleCategorySelect} onBack={() => handleNavigation('home')} />;
       default:
         return <HomePage onCategorySelect={handleCategorySelect} />;
     }

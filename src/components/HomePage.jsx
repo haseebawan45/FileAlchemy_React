@@ -5,7 +5,7 @@ import { useConversion } from '../hooks/useConversion';
 import Card from './ui/Card';
 import Button from './ui/Button';
 
-const HomePage = ({ onCategorySelect }) => {
+const HomePage = ({ onCategorySelect, onNavigate }) => {
   const { dispatch, actions } = useApp();
   const { resetConversion } = useConversion();
 
@@ -47,7 +47,7 @@ const HomePage = ({ onCategorySelect }) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </Button>
-            <Button variant="secondary" size="lg">
+            <Button variant="secondary" size="lg" onClick={() => onNavigate('formats')}>
               View All Formats
             </Button>
           </div>
