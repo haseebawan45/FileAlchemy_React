@@ -18,17 +18,33 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Subscribe to auth state changes
-    const unsubscribe = authService.onAuthStateChange((firebaseUser) => {
+    const unsubscribe = authService.onAuthStateChange(async (firebaseUser) => {
       if (firebaseUser) {
-        // User is signed in
-        setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || 'User',
-          photoURL: firebaseUser.photoURL,
-          emailVerified: firebaseUser.emailVerified,
-          isAnonymous: firebaseUser.isAnonymous
-        });
+        // User is signed in - fetch additional data from Firestore
+        try {
+          const userDoc = await authService.getUserDocument(firebaseUser.uid);
+          const displayName = userDoc?.displayName || firebaseUser.displayName || 'User';
+          
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: displayName,
+            photoURL: firebaseUser.photoURL || userDoc?.photoURL,
+            emailVerified: firebaseUser.emailVerified,
+            isAnonymous: firebaseUser.isAnonymous
+          });
+        } catch (error) {
+          console.error('Error fetching user document:', error);
+          // Fallback to Firebase Auth data
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || 'User',
+            photoURL: firebaseUser.photoURL,
+            emailVerified: firebaseUser.emailVerified,
+            isAnonymous: firebaseUser.isAnonymous
+          });
+        }
       } else {
         // User is signed out
         setUser(null);

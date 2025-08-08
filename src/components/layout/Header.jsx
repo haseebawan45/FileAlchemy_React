@@ -93,14 +93,14 @@ const Header = ({ currentView, onNavigate, user }) => {
                   <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                       <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-purple-600 rounded-full flex items-center justify-center">
+                        <div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
                           <span className="text-white font-medium">
                             {user.name?.charAt(0).toUpperCase() || 'U'}
                           </span>
                         </div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">{user.name}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-gray-900 dark:text-white truncate">{user.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 truncate" title={user.email}>{user.email}</div>
                         </div>
                       </div>
                     </div>
