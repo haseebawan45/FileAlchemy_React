@@ -63,8 +63,9 @@ export const supportedConversions = {
   'TXT': ['DOCX', 'PDF', 'HTML'],
   'HTML': ['PDF', 'DOCX', 'TXT'],
   'RTF': ['DOCX', 'PDF', 'TXT'],
-  'XLSX': ['CSV', 'PDF', 'ODS', 'TXT'],
-  'CSV': ['XLSX', 'PDF', 'TXT'],
+  'XLSX': ['CSV', 'PDF', 'TXT'],
+  'CSV': ['XLSX', 'PDF', 'TXT', 'JSON'],
+  'JSON': ['CSV', 'XLSX'],
   'PPTX': ['PDF', 'JPEG', 'ODP'],
 
   // Video conversions
