@@ -47,11 +47,24 @@ function AppContent() {
   };
 
   const addToHistory = async (conversion) => {
+    // Add to local state for immediate UI update
     setConversionHistory(prev => [conversion, ...prev.slice(0, 9)]); // Keep last 10
     
-    // Track conversion for authenticated users
-    if (user) {
-      await trackConversion(conversion);
+    // Save to Firestore (includes tracking for authenticated users)
+    try {
+      const { default: firestoreService } = await import('./services/firestoreService');
+      await firestoreService.saveConversionRecord(conversion, user?.uid);
+      
+      // Legacy tracking for backward compatibility
+      if (user) {
+        await trackConversion(conversion);
+      }
+    } catch (error) {
+      console.error('Error saving conversion to Firestore:', error);
+      // Continue with local storage fallback
+      if (user) {
+        await trackConversion(conversion);
+      }
     }
   };
 

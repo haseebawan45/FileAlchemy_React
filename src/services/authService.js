@@ -325,6 +325,13 @@ class AuthService {
     if (!this.currentUser) return;
 
     try {
+      // Import firestoreService dynamically to avoid circular dependency
+      const { default: firestoreService } = await import('./firestoreService');
+      
+      // Save detailed conversion record
+      await firestoreService.saveConversionRecord(conversionData, this.currentUser.uid);
+      
+      // Legacy stats update for backward compatibility
       await this.updateUserDocument(this.currentUser.uid, {
         'stats.totalConversions': (await this.getUserDocument(this.currentUser.uid))?.stats?.totalConversions + 1 || 1,
         'stats.lastConversionAt': new Date().toISOString()

@@ -153,6 +153,8 @@ export class ConversionApi {
    * Convert files with progress tracking
    */
   static async convertFiles(files, sourceFormat, targetFormat, onProgress = null) {
+    const startTime = Date.now();
+    
     try {
       // Start conversion
       const uploadResult = await this.startConversion(files, sourceFormat, targetFormat);
@@ -171,15 +173,82 @@ export class ConversionApi {
         error: item.error
       }));
 
+      const endTime = Date.now();
+      const processingTimeMs = endTime - startTime;
+      const successfulFiles = processedResults.filter(r => r.success).length;
+      const failedFiles = processedResults.length - successfulFiles;
+
+      // Prepare conversion data for Firestore
+      const conversionData = {
+        sourceFormat,
+        targetFormat,
+        category: this.getCategoryFromFormat(sourceFormat),
+        files,
+        success: successfulFiles > 0,
+        successfulFiles,
+        failedFiles,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        processingTimeMs,
+        backendUsed: 'api',
+        apiVersion: '1.0',
+        results: processedResults
+      };
+
+      // Save to Firestore (will be handled by the calling component)
       return {
         success: true,
         results: processedResults,
-        message: `Successfully converted ${processedResults.filter(r => r.success).length} of ${processedResults.length} files`
+        message: `Successfully converted ${successfulFiles} of ${processedResults.length} files`,
+        conversionData // Include this for Firestore tracking
       };
 
     } catch (error) {
+      const endTime = Date.now();
+      const processingTimeMs = endTime - startTime;
+
+      // Prepare error conversion data for Firestore
+      const conversionData = {
+        sourceFormat,
+        targetFormat,
+        category: this.getCategoryFromFormat(sourceFormat),
+        files,
+        success: false,
+        successfulFiles: 0,
+        failedFiles: files.length,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        processingTimeMs,
+        backendUsed: 'api',
+        apiVersion: '1.0',
+        errorMessage: error.message
+      };
+
+      // Attach conversion data to error for tracking
+      error.conversionData = conversionData;
       throw error;
     }
+  }
+
+  /**
+   * Get category from format
+   */
+  static getCategoryFromFormat(format) {
+    const imageFormats = ['JPEG', 'PNG', 'WEBP', 'BMP', 'TIFF', 'GIF', 'SVG', 'ICO', 'HEIC'];
+    const documentFormats = ['PDF', 'DOCX', 'TXT', 'HTML', 'RTF', 'XLSX', 'CSV', 'PPTX', 'ODT', 'ODS', 'ODP'];
+    const videoFormats = ['MP4', 'AVI', 'MOV', 'MKV', 'WMV', 'WEBM'];
+    const audioFormats = ['MP3', 'WAV', 'AAC', 'FLAC', 'OGG'];
+    const archiveFormats = ['ZIP', 'RAR', '7Z', 'TAR', 'GZ'];
+
+    const upperFormat = format.toUpperCase();
+    
+    if (imageFormats.includes(upperFormat)) return 'images';
+    if (documentFormats.includes(upperFormat)) return 'documents';
+    if (videoFormats.includes(upperFormat)) return 'video';
+    if (audioFormats.includes(upperFormat)) return 'audio';
+    if (archiveFormats.includes(upperFormat)) return 'archives';
+    
+    return 'other';
   }
 
   /**
@@ -234,6 +303,8 @@ export class ConversionApi {
  */
 export class MockConversionApi {
   static async convertFiles(files, sourceFormat, targetFormat, onProgress = null) {
+    const startTime = Date.now();
+    
     // Simulate conversion time
     const totalFiles = files.length;
     const results = [];
@@ -264,10 +335,33 @@ export class MockConversionApi {
       });
     }
     
+    const endTime = Date.now();
+    const processingTimeMs = endTime - startTime;
+    const successfulFiles = results.filter(r => r.success).length;
+    const failedFiles = results.length - successfulFiles;
+
+    // Prepare conversion data for Firestore
+    const conversionData = {
+      sourceFormat,
+      targetFormat,
+      category: ConversionApi.getCategoryFromFormat(sourceFormat),
+      files,
+      success: successfulFiles > 0,
+      successfulFiles,
+      failedFiles,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      processingTimeMs,
+      backendUsed: 'mock',
+      apiVersion: '1.0',
+      results
+    };
+    
     return {
       success: true,
       results,
-      message: `Successfully converted ${results.filter(r => r.success).length} of ${totalFiles} files`
+      message: `Successfully converted ${successfulFiles} of ${totalFiles} files`,
+      conversionData // Include this for Firestore tracking
     };
   }
 }
