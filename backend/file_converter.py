@@ -70,12 +70,19 @@ class ImageConverter(BaseConverter):
             from PIL import Image
             
             with Image.open(input_path) as img:
-                # Handle RGBA for formats that don't support transparency
-                if output_ext in ['jpg', 'jpeg'] and img.mode in ['RGBA', 'LA']:
-                    # Create white background for JPEG
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-                    img = background
+                # Handle different color modes for JPEG conversion
+                if output_ext in ['jpg', 'jpeg']:
+                    if img.mode in ['RGBA', 'LA']:
+                        # Create white background for JPEG (transparency not supported)
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                        img = background
+                    elif img.mode == 'P':
+                        # Convert palette mode (common in GIFs) to RGB
+                        img = img.convert('RGB')
+                    elif img.mode not in ['RGB', 'L']:
+                        # Convert any other mode to RGB
+                        img = img.convert('RGB')
                 
                 # Convert and save
                 save_format = output_ext.upper()
@@ -810,27 +817,92 @@ class MediaConverter(BaseConverter):
         if not self.available:
             return False
             
+        input_ext = Path(input_path).suffix.lower().lstrip('.')
+        output_ext = Path(output_path).suffix.lower().lstrip('.')
+        
+        print(f"Starting media conversion: {input_ext} -> {output_ext}")
+        
         try:
             cmd = ['ffmpeg', '-i', input_path]
             
-            # Add common options
-            if 'quality' in kwargs:
-                cmd.extend(['-crf', str(kwargs['quality'])])
-            if 'bitrate' in kwargs:
-                cmd.extend(['-b:v', kwargs['bitrate']])
+            # Special handling for different conversion types
+            if input_ext == 'gif' and output_ext in ['mp4', 'avi', 'mov', 'mkv', 'webm']:
+                # GIF to video conversion
+                cmd.extend(['-movflags', 'faststart'])
+                cmd.extend(['-pix_fmt', 'yuv420p'])
+                if 'fps' in kwargs:
+                    cmd.extend(['-r', str(kwargs['fps'])])
+                else:
+                    cmd.extend(['-r', '15'])  # Default 15 fps for GIF to video
+                    
+            elif output_ext == 'gif':
+                # Video to GIF conversion
+                # Use palette generation for better quality
+                if input_ext in ['mp4', 'avi', 'mov', 'mkv', 'webm']:
+                    # Two-pass conversion for better GIF quality
+                    palette_path = output_path.replace('.gif', '_palette.png')
+                    
+                    # First pass: generate palette
+                    palette_cmd = ['ffmpeg', '-i', input_path, '-vf', 'palettegen', '-y', palette_path]
+                    palette_result = subprocess.run(palette_cmd, capture_output=True, text=True)
+                    
+                    if palette_result.returncode == 0:
+                        # Second pass: create GIF with palette
+                        fps = kwargs.get('fps', 10)  # Default 10 fps for video to GIF
+                        scale = kwargs.get('scale', '320:-1')  # Default scale
+                        cmd = ['ffmpeg', '-i', input_path, '-i', palette_path]
+                        cmd.extend(['-filter_complex', f'fps={fps},scale={scale}:flags=lanczos[x];[x][1:v]paletteuse'])
+                        cmd.extend(['-y', output_path])
+                        
+                        result = subprocess.run(cmd, capture_output=True, text=True)
+                        
+                        # Cleanup palette file
+                        try:
+                            os.remove(palette_path)
+                        except:
+                            pass
+                        
+                        if result.returncode == 0:
+                            print(f"Successfully converted {input_ext} to GIF with palette optimization")
+                            return True
+                    
+                    # Fallback to simple conversion if palette method fails
+                    print("Palette method failed, using simple GIF conversion")
+                    cmd = ['ffmpeg', '-i', input_path]
+                    fps = kwargs.get('fps', 10)
+                    scale = kwargs.get('scale', '320:-1')
+                    cmd.extend(['-vf', f'fps={fps},scale={scale}:flags=lanczos'])
+                    
+            else:
+                # Standard video/audio conversion
+                if 'quality' in kwargs:
+                    cmd.extend(['-crf', str(kwargs['quality'])])
+                if 'bitrate' in kwargs:
+                    cmd.extend(['-b:v', kwargs['bitrate']])
+                if 'audio_bitrate' in kwargs:
+                    cmd.extend(['-b:a', kwargs['audio_bitrate']])
             
             cmd.extend(['-y', output_path])  # -y to overwrite
             
+            print(f"Running FFmpeg command: {' '.join(cmd[:5])}... (truncated)")
             result = subprocess.run(cmd, capture_output=True, text=True)
-            return result.returncode == 0
+            
+            if result.returncode == 0:
+                print(f"Media conversion successful: {input_ext} -> {output_ext}")
+                return True
+            else:
+                print(f"FFmpeg error: {result.stderr}")
+                return False
             
         except Exception as e:
             print(f"Media conversion failed: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def supported_formats(self) -> Dict[str, List[str]]:
         return {
-            'input': ['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'mp3', 'wav', 'flac', 'aac', 'ogg'],
+            'input': ['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm', 'gif', 'mp3', 'wav', 'flac', 'aac', 'ogg'],
             'output': ['mp4', 'avi', 'mov', 'mkv', 'webm', 'wmv', 'gif', 'mp3', 'wav', 'aac', 'flac', 'ogg']
         }
 
