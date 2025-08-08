@@ -1,10 +1,18 @@
+# Web API Framework
+Flask>=2.3.0
+Flask-CORS>=4.0.0
+
 # Image conversion
 Pillow>=10.0.0
-pillow-heif>=0.13.0
+# pillow-heif>=0.13.0  # Optional: HEIC/HEIF support
 
 # Document conversion
 PyMuPDF>=1.23.0
 pdf2docx>=0.5.6
+
+# Archive handling
+py7zr>=0.20.0
+rarfile>=4.0
 
 # Optional: Enhanced document conversion
 # pypandoc>=1.11
@@ -12,11 +20,8 @@ pdf2docx>=0.5.6
 # Media conversion requires FFmpeg binary to be installed separately
 # ffmpeg-python>=0.2.0
 
-# Archive handling (built into Python standard library)
-# zipfile, tarfile - no additional packages needed
-
 # Optional: OCR capabilities
 # ocrmypdf>=14.0.0
 
-# Optional: SVG conversion
+# Optional: SVG conversion (requires system Cairo library)
 # cairosvg>=2.7.0

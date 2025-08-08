@@ -27,20 +27,30 @@ class ImageConverter(BaseConverter):
     
     def __init__(self):
         self.available_libs = {}
+        
+        # Check for basic image support (Pillow)
         try:
             from PIL import Image
-            import pillow_heif
-            pillow_heif.register_heif_opener()
             self.available_libs['pillow'] = True
         except ImportError as e:
-            print(f"Image conversion unavailable: {e}")
+            print(f"Basic image conversion unavailable: {e}")
             self.available_libs['pillow'] = False
+        
+        # Check for HEIF support (optional)
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+            self.available_libs['pillow_heif'] = True
+        except ImportError as e:
+            print(f"HEIF image support unavailable (this is optional): {e}")
+            self.available_libs['pillow_heif'] = False
             
-        # Check for SVG support
+        # Check for SVG support (optional, requires system Cairo library)
         try:
             import cairosvg
             self.available_libs['cairosvg'] = True
-        except ImportError:
+        except (ImportError, OSError) as e:
+            print(f"SVG conversion unavailable (this is optional): {e}")
             self.available_libs['cairosvg'] = False
             
         self.available = self.available_libs['pillow']

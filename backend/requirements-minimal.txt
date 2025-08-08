@@ -1,0 +1,15 @@
+# Minimal requirements for FileAlchemy Backend
+# This file contains only essential dependencies that work on most systems
+
+# Web API Framework
+Flask>=2.3.0
+Flask-CORS>=4.0.0
+
+# Basic image conversion (works on all systems)
+Pillow>=10.0.0
+
+# Basic document conversion
+PyMuPDF>=1.23.0
+
+# Archive handling (built-in Python libraries used by default)
+# py7zr and rarfile are optional and loaded dynamically
