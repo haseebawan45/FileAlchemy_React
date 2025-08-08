@@ -183,6 +183,30 @@ class DocumentConverter(BaseConverter):
         elif input_ext == '.docx' and output_ext == '.pdf':
             return self._docx_to_pdf(input_path, output_path, **kwargs)
         
+        # DOCX to TXT conversion
+        elif input_ext == '.docx' and output_ext == '.txt':
+            return self._docx_to_txt(input_path, output_path, **kwargs)
+        
+        # TXT to DOCX conversion
+        elif input_ext == '.txt' and output_ext == '.docx':
+            return self._txt_to_docx(input_path, output_path, **kwargs)
+        
+        # TXT to PDF conversion
+        elif input_ext == '.txt' and output_ext == '.pdf':
+            return self._txt_to_pdf(input_path, output_path, **kwargs)
+        
+        # TXT to HTML conversion
+        elif input_ext == '.txt' and output_ext == '.html':
+            return self._txt_to_html(input_path, output_path, **kwargs)
+        
+        # HTML to TXT conversion
+        elif input_ext == '.html' and output_ext == '.txt':
+            return self._html_to_txt(input_path, output_path, **kwargs)
+        
+        # HTML to PDF conversion
+        elif input_ext == '.html' and output_ext == '.pdf':
+            return self._html_to_pdf(input_path, output_path, **kwargs)
+        
         return False
     
     def _pdf_to_docx(self, input_path: str, output_path: str, **kwargs) -> bool:
@@ -380,16 +404,391 @@ class DocumentConverter(BaseConverter):
             traceback.print_exc()
             return False
     
+    def _docx_to_txt(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert DOCX to plain text"""
+        print(f"Starting DOCX to TXT conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['python_docx']:
+            print("python-docx not available for DOCX reading")
+            return False
+            
+        try:
+            import docx
+            
+            # Read DOCX document
+            doc = docx.Document(input_path)
+            
+            # Extract all text content
+            text_content = []
+            
+            # Process paragraphs
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    text_content.append(paragraph.text)
+            
+            # Process tables
+            for table in doc.tables:
+                text_content.append("\n--- Table Content ---")
+                for row in table.rows:
+                    row_text = " | ".join([cell.text for cell in row.cells])
+                    if row_text.strip():
+                        text_content.append(row_text)
+                text_content.append("--- End Table ---\n")
+            
+            # Write to text file
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(text_content))
+            
+            print(f"Successfully converted DOCX to TXT: {len(doc.paragraphs)} paragraphs, {len(doc.tables)} tables")
+            return True
+            
+        except Exception as e:
+            print(f"DOCX to TXT conversion failed: {e}")
+            return False
+    
+    def _txt_to_docx(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert plain text to DOCX"""
+        print(f"Starting TXT to DOCX conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['python_docx']:
+            print("python-docx not available for DOCX creation")
+            return False
+            
+        try:
+            import docx
+            
+            # Read text file
+            with open(input_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Create new DOCX document
+            doc = docx.Document()
+            
+            # Add title based on filename
+            filename = Path(input_path).stem
+            doc.add_heading(f'Document: {filename}', 0)
+            
+            # Split content into paragraphs
+            paragraphs = content.split('\n')
+            
+            for para_text in paragraphs:
+                if para_text.strip():
+                    # Check if it looks like a heading (all caps, short, etc.)
+                    if (len(para_text.strip()) < 50 and 
+                        para_text.strip().isupper() and 
+                        not para_text.strip().endswith('.')):
+                        doc.add_heading(para_text.strip(), level=1)
+                    else:
+                        doc.add_paragraph(para_text)
+                else:
+                    # Add empty paragraph for spacing
+                    doc.add_paragraph('')
+            
+            # Save DOCX document
+            doc.save(output_path)
+            
+            print(f"Successfully converted TXT to DOCX: {len(paragraphs)} paragraphs")
+            return True
+            
+        except Exception as e:
+            print(f"TXT to DOCX conversion failed: {e}")
+            return False
+    
+    def _txt_to_pdf(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert plain text to PDF"""
+        print(f"Starting TXT to PDF conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['reportlab']:
+            print("reportlab not available for PDF creation")
+            return False
+            
+        try:
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter, A4
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.lib.units import inch
+            
+            # Read text file
+            with open(input_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Create PDF document
+            pdf_doc = SimpleDocTemplate(
+                output_path,
+                pagesize=A4,
+                rightMargin=72,
+                leftMargin=72,
+                topMargin=72,
+                bottomMargin=18
+            )
+            
+            # Get styles
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Add title
+            filename = Path(input_path).stem
+            title = Paragraph(f"Text Document: {filename}", styles['Title'])
+            story.append(title)
+            story.append(Spacer(1, 20))
+            
+            # Split content into paragraphs
+            paragraphs = content.split('\n')
+            
+            for para_text in paragraphs:
+                if para_text.strip():
+                    # Check if it looks like a heading
+                    if (len(para_text.strip()) < 50 and 
+                        para_text.strip().isupper() and 
+                        not para_text.strip().endswith('.')):
+                        para = Paragraph(para_text.strip(), styles['Heading1'])
+                    else:
+                        para = Paragraph(para_text, styles['Normal'])
+                    story.append(para)
+                    story.append(Spacer(1, 12))
+                else:
+                    story.append(Spacer(1, 12))
+            
+            # Build PDF
+            pdf_doc.build(story)
+            
+            print(f"Successfully converted TXT to PDF: {len(paragraphs)} paragraphs")
+            return True
+            
+        except Exception as e:
+            print(f"TXT to PDF conversion failed: {e}")
+            return False
+    
+    def _txt_to_html(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert plain text to HTML"""
+        print(f"Starting TXT to HTML conversion: {input_path} -> {output_path}")
+        
+        try:
+            # Read text file
+            with open(input_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Get filename for title
+            filename = Path(input_path).stem
+            
+            # Create HTML content
+            html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{filename}</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }}
+        .container {{
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        h1 {{
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 10px;
+        }}
+        h2 {{
+            color: #555;
+            margin-top: 30px;
+        }}
+        p {{
+            margin-bottom: 15px;
+            text-align: justify;
+        }}
+        .empty-line {{
+            height: 15px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Text Document: {filename}</h1>
+"""
+            
+            # Process content
+            paragraphs = content.split('\n')
+            
+            for para_text in paragraphs:
+                if para_text.strip():
+                    # Check if it looks like a heading
+                    if (len(para_text.strip()) < 50 and 
+                        para_text.strip().isupper() and 
+                        not para_text.strip().endswith('.')):
+                        html_content += f"        <h2>{para_text.strip()}</h2>\n"
+                    else:
+                        # Escape HTML characters and preserve line breaks
+                        escaped_text = para_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                        html_content += f"        <p>{escaped_text}</p>\n"
+                else:
+                    html_content += '        <div class="empty-line"></div>\n'
+            
+            # Close HTML
+            html_content += """    </div>
+</body>
+</html>"""
+            
+            # Write HTML file
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            print(f"Successfully converted TXT to HTML: {len(paragraphs)} paragraphs")
+            return True
+            
+        except Exception as e:
+            print(f"TXT to HTML conversion failed: {e}")
+            return False
+    
+    def _html_to_txt(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert HTML to plain text"""
+        print(f"Starting HTML to TXT conversion: {input_path} -> {output_path}")
+        
+        try:
+            # Try to use BeautifulSoup if available, otherwise use simple parsing
+            try:
+                from bs4 import BeautifulSoup
+                
+                # Read HTML file
+                with open(input_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                
+                # Parse HTML
+                soup = BeautifulSoup(html_content, 'html.parser')
+                
+                # Extract text content
+                text_content = soup.get_text()
+                
+                # Clean up extra whitespace
+                lines = [line.strip() for line in text_content.split('\n')]
+                cleaned_lines = []
+                
+                for line in lines:
+                    if line:
+                        cleaned_lines.append(line)
+                    elif cleaned_lines and cleaned_lines[-1]:  # Add empty line only if previous line had content
+                        cleaned_lines.append('')
+                
+                text_content = '\n'.join(cleaned_lines)
+                
+            except ImportError:
+                print("BeautifulSoup not available, using simple HTML parsing")
+                
+                # Simple HTML parsing without BeautifulSoup
+                with open(input_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+                
+                # Remove HTML tags using simple regex
+                import re
+                
+                # Remove script and style elements
+                html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+                html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+                
+                # Remove HTML tags
+                text_content = re.sub(r'<[^>]+>', '', html_content)
+                
+                # Decode HTML entities
+                text_content = text_content.replace('&amp;', '&')
+                text_content = text_content.replace('&lt;', '<')
+                text_content = text_content.replace('&gt;', '>')
+                text_content = text_content.replace('&quot;', '"')
+                text_content = text_content.replace('&#39;', "'")
+                text_content = text_content.replace('&nbsp;', ' ')
+                
+                # Clean up whitespace
+                lines = [line.strip() for line in text_content.split('\n')]
+                text_content = '\n'.join(line for line in lines if line)
+            
+            # Write text file
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(text_content)
+            
+            print(f"Successfully converted HTML to TXT")
+            return True
+            
+        except Exception as e:
+            print(f"HTML to TXT conversion failed: {e}")
+            return False
+    
+    def _html_to_pdf(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert HTML to PDF"""
+        print(f"Starting HTML to PDF conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['reportlab']:
+            print("reportlab not available for PDF creation")
+            return False
+            
+        try:
+            # First convert HTML to text, then text to PDF
+            import tempfile
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
+                temp_txt_path = temp_file.name
+            
+            # Convert HTML to text first
+            if not self._html_to_txt(input_path, temp_txt_path):
+                return False
+            
+            # Then convert text to PDF
+            result = self._txt_to_pdf(temp_txt_path, output_path, **kwargs)
+            
+            # Cleanup temp file
+            import os
+            try:
+                os.unlink(temp_txt_path)
+            except:
+                pass
+            
+            if result:
+                print(f"Successfully converted HTML to PDF via text conversion")
+            
+            return result
+            
+        except Exception as e:
+            print(f"HTML to PDF conversion failed: {e}")
+            return False
+    
     def supported_formats(self) -> Dict[str, List[str]]:
         formats = {'input': [], 'output': []}
+        
+        # PDF conversions
         if self.available_libs['pymupdf']:
             formats['input'].extend(['pdf'])
-            formats['output'].extend(['txt', 'jpg', 'jpeg', 'png'])  # Added image formats
+            formats['output'].extend(['txt', 'jpg', 'jpeg', 'png'])
         if self.available_libs['pdf2docx']:
             formats['output'].extend(['docx'])
-        if self.available_libs['python_docx'] and self.available_libs['reportlab']:
-            formats['input'].extend(['docx'])  # DOCX as input
-            formats['output'].extend(['pdf'])  # PDF as output
+        
+        # DOCX conversions
+        if self.available_libs['python_docx']:
+            formats['input'].extend(['docx'])
+            formats['output'].extend(['txt'])
+            if self.available_libs['reportlab']:
+                formats['output'].extend(['pdf'])
+        
+        # Text conversions
+        formats['input'].extend(['txt', 'html'])  # Always available
+        formats['output'].extend(['html'])  # Always available
+        
+        if self.available_libs['python_docx']:
+            formats['output'].extend(['docx'])
+        if self.available_libs['reportlab']:
+            formats['output'].extend(['pdf'])
+        
+        # Remove duplicates
+        formats['input'] = list(set(formats['input']))
+        formats['output'] = list(set(formats['output']))
+        
         return formats
 
 class MediaConverter(BaseConverter):
