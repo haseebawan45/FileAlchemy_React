@@ -160,6 +160,10 @@ class DocumentConverter(BaseConverter):
         elif input_ext == '.pdf' and output_ext == '.txt':
             return self._pdf_to_text(input_path, output_path, **kwargs)
         
+        # PDF to image conversion (multi-page to ZIP)
+        elif input_ext == '.pdf' and output_ext in ['.jpg', '.jpeg', '.png']:
+            return self._pdf_to_images(input_path, output_path, **kwargs)
+        
         return False
     
     def _pdf_to_docx(self, input_path: str, output_path: str, **kwargs) -> bool:
@@ -197,11 +201,87 @@ class DocumentConverter(BaseConverter):
             print(f"PDF to text conversion failed: {e}")
             return False
     
+    def _pdf_to_images(self, input_path: str, output_path: str, **kwargs) -> bool:
+        """Convert PDF pages to images and package in ZIP file"""
+        print(f"Starting PDF to images conversion: {input_path} -> {output_path}")
+        
+        if not self.available_libs['pymupdf']:
+            print("PyMuPDF not available for PDF to image conversion")
+            return False
+            
+        try:
+            import fitz
+            import zipfile
+            import tempfile
+            import os
+            
+            # For PDF to images, we need to determine the target format from kwargs or default to jpg
+            target_format = kwargs.get('target_format', 'jpg').lower()
+            if target_format in ['jpeg']:
+                target_format = 'jpg'
+            
+            print(f"Target image format: {target_format}")
+            
+            if target_format not in ['jpg', 'png']:
+                print(f"Unsupported image format: {target_format}")
+                return False
+            
+            # Open PDF document
+            doc = fitz.open(input_path)
+            
+            # Create temporary directory for images
+            with tempfile.TemporaryDirectory() as temp_dir:
+                image_files = []
+                
+                # Convert each page to image
+                for page_num in range(len(doc)):
+                    page = doc.load_page(page_num)
+                    
+                    # Set resolution (DPI) - higher values = better quality but larger files
+                    dpi = kwargs.get('dpi', 150)  # Default 150 DPI
+                    zoom = dpi / 72  # 72 is the default DPI
+                    mat = fitz.Matrix(zoom, zoom)
+                    
+                    # Render page to pixmap
+                    pix = page.get_pixmap(matrix=mat)
+                    
+                    # Generate filename for this page
+                    base_name = Path(input_path).stem
+                    page_filename = f"{base_name}_page_{page_num + 1:03d}.{target_format}"
+                    page_path = os.path.join(temp_dir, page_filename)
+                    
+                    # Save image
+                    if target_format in ['jpg', 'jpeg']:
+                        # Convert to RGB for JPEG (remove alpha channel)
+                        if pix.alpha:
+                            pix = fitz.Pixmap(fitz.csRGB, pix)
+                        pix.save(page_path)
+                    else:
+                        # PNG supports alpha channel
+                        pix.save(page_path)
+                    
+                    image_files.append((page_filename, page_path))
+                    pix = None  # Free memory
+                
+                doc.close()
+                
+                # Create ZIP file with all images
+                with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for filename, filepath in image_files:
+                        zipf.write(filepath, filename)
+                
+                print(f"Successfully converted {len(image_files)} pages to {target_format.upper()} images in ZIP file")
+                return True
+                
+        except Exception as e:
+            print(f"PDF to images conversion failed: {e}")
+            return False
+    
     def supported_formats(self) -> Dict[str, List[str]]:
         formats = {'input': [], 'output': []}
         if self.available_libs['pymupdf']:
             formats['input'].extend(['pdf'])
-            formats['output'].extend(['txt'])
+            formats['output'].extend(['txt', 'jpg', 'jpeg', 'png'])  # Added image formats
         if self.available_libs['pdf2docx']:
             formats['output'].extend(['docx'])
         return formats
@@ -408,25 +488,102 @@ class FileConversionService:
     
     def convert_file(self, input_path: str, output_path: str, **kwargs) -> bool:
         """Convert a file based on its extension"""
-        input_ext = Path(input_path).suffix.lower().lstrip('.')
-        output_ext = Path(output_path).suffix.lower().lstrip('.')
-        
-        # Determine converter type
-        converter_type = self._get_converter_type(input_ext, output_ext)
-        if not converter_type:
-            print(f"No converter found for {input_ext} -> {output_ext}")
+        try:
+            input_ext = Path(input_path).suffix.lower().lstrip('.')
+            output_ext = Path(output_path).suffix.lower().lstrip('.')
+            
+            # Special case: PDF to image conversion where output file is .zip but target format is image
+            target_format = kwargs.get('target_format')
+            if input_ext == 'pdf' and output_ext == 'zip' and target_format:
+                actual_target_ext = target_format.lower()
+                print(f"PDF to image conversion detected: {input_ext} -> {actual_target_ext} (packaged as ZIP)")
+                output_ext = actual_target_ext  # Use the actual target format for converter selection
+            
+            print(f"Converting: {input_ext} -> {output_ext}")
+            print(f"Input file: {input_path}")
+            print(f"Output file: {output_path}")
+            
+            # Check if input file exists
+            if not os.path.exists(input_path):
+                print(f"Error: Input file does not exist: {input_path}")
+                return False
+            
+            # Check file size
+            file_size = os.path.getsize(input_path)
+            print(f"Input file size: {file_size} bytes")
+            
+            # Determine converter type
+            converter_type = self._get_converter_type(input_ext, output_ext)
+            if not converter_type:
+                print(f"No converter found for {input_ext} -> {output_ext}")
+                return False
+            
+            print(f"Using converter: {converter_type}")
+            converter = self.converters[converter_type]
+            
+            # Perform conversion
+            result = converter.convert(input_path, output_path, **kwargs)
+            print(f"Conversion result: {result}")
+            
+            # Check if output file was created
+            if result and os.path.exists(output_path):
+                output_size = os.path.getsize(output_path)
+                print(f"Output file created successfully, size: {output_size} bytes")
+            elif result:
+                print("Warning: Conversion reported success but output file not found")
+                return False
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error in convert_file: {e}")
+            import traceback
+            traceback.print_exc()
             return False
-        
-        converter = self.converters[converter_type]
-        return converter.convert(input_path, output_path, **kwargs)
     
     def _get_converter_type(self, input_ext: str, output_ext: str) -> Optional[str]:
         """Determine which converter to use based on file extensions"""
+        # Special case: PDF to image conversion (output will be ZIP, but we check for image format)
+        if input_ext == 'pdf' and output_ext in ['jpg', 'jpeg', 'png']:
+            return 'document'  # DocumentConverter handles PDF to images
+        
         for conv_type, converter in self.converters.items():
             formats = converter.supported_formats()
             if input_ext in formats['input'] and output_ext in formats['output']:
                 return conv_type
         return None
+    
+    def is_conversion_supported(self, input_ext: str, output_ext: str) -> tuple[bool, str]:
+        """Check if a conversion is supported and return reason if not"""
+        input_ext = input_ext.lower()
+        output_ext = output_ext.lower()
+        
+        # Special case for RAR creation
+        if output_ext == 'rar':
+            return False, "RAR creation requires proprietary WinRAR software and is not supported"
+        
+        # Check if conversion is supported
+        converter_type = self._get_converter_type(input_ext, output_ext)
+        if converter_type:
+            return True, "Conversion supported"
+        
+        # Check if input format is supported at all
+        input_supported = False
+        output_supported = False
+        
+        for conv_type, converter in self.converters.items():
+            formats = converter.supported_formats()
+            if input_ext in formats['input']:
+                input_supported = True
+            if output_ext in formats['output']:
+                output_supported = True
+        
+        if not input_supported:
+            return False, f"Input format '{input_ext}' is not supported"
+        elif not output_supported:
+            return False, f"Output format '{output_ext}' is not supported"
+        else:
+            return False, f"Conversion from '{input_ext}' to '{output_ext}' is not supported"
     
     def list_supported_formats(self) -> Dict[str, Dict[str, List[str]]]:
         """List all supported formats by converter type"""

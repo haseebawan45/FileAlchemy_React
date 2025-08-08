@@ -58,7 +58,7 @@ export const supportedConversions = {
   'HEIC': ['JPEG', 'PNG'],
 
   // Document conversions  
-  'PDF': ['DOCX', 'TXT', 'HTML', 'RTF', 'JPEG'],
+  'PDF': ['DOCX', 'TXT', 'HTML', 'RTF', 'JPEG', 'PNG'],
   'DOCX': ['PDF', 'TXT', 'RTF', 'HTML', 'ODT'],
   'TXT': ['DOCX', 'PDF', 'HTML'],
   'HTML': ['PDF', 'DOCX', 'TXT'],
@@ -83,11 +83,11 @@ export const supportedConversions = {
   'OGG': ['MP3', 'WAV', 'AAC', 'FLAC'],
 
   // Archive conversions
-  'ZIP': ['RAR', '7Z', 'TAR'],
-  'RAR': ['ZIP', '7Z'], 
-  '7Z': ['ZIP', 'RAR', 'TAR'],
+  'ZIP': ['7Z', 'TAR', 'GZ'],
+  'RAR': ['ZIP', '7Z', 'TAR', 'GZ'], // RAR can be extracted to other formats
+  '7Z': ['ZIP', 'TAR', 'GZ'],
   'TAR': ['ZIP', '7Z', 'GZ'],
-  'GZ': ['TAR']
+  'GZ': ['ZIP', '7Z', 'TAR']
 };
 
 export const getConversionsByCategory = (category) => {
@@ -123,4 +123,17 @@ export const getCategoryByFormat = (format) => {
 export const getFormatIcon = (format) => {
   const category = getCategoryByFormat(format);
   return conversionCategories[category].icon;
+};
+
+export const isMultiPageConversion = (sourceFormat, targetFormat) => {
+  // PDF to image conversions result in multiple files (one per page) packaged in ZIP
+  return sourceFormat?.toUpperCase() === 'PDF' && 
+         ['JPEG', 'PNG'].includes(targetFormat?.toUpperCase());
+};
+
+export const getConversionDescription = (sourceFormat, targetFormat) => {
+  if (isMultiPageConversion(sourceFormat, targetFormat)) {
+    return `Convert PDF pages to ${targetFormat.toUpperCase()} images (packaged in ZIP file)`;
+  }
+  return `Convert ${sourceFormat?.toUpperCase()} to ${targetFormat?.toUpperCase()}`;
 };

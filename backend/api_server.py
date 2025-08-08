@@ -122,11 +122,38 @@ def process_conversion_job(job):
         for i, file_info in enumerate(job.files):
             input_path = file_info['path']
             filename_without_ext = Path(file_info['filename']).stem
-            output_filename = f"{filename_without_ext}.{job.target_format.lower()}"
-            output_path = os.path.join(CONVERTED_FOLDER, f"{job.job_id}_{output_filename}")
+            
+            # Special handling for PDF to image conversion (results in ZIP file)
+            if job.source_format.upper() == 'PDF' and job.target_format.upper() in ['JPG', 'JPEG', 'PNG']:
+                output_filename = f"{filename_without_ext}_pages.zip"
+                output_path = os.path.join(CONVERTED_FOLDER, f"{job.job_id}_{output_filename}")
+            else:
+                output_filename = f"{filename_without_ext}.{job.target_format.lower()}"
+                output_path = os.path.join(CONVERTED_FOLDER, f"{job.job_id}_{output_filename}")
             
             # Perform conversion
-            success = conversion_service.convert_file(input_path, output_path)
+            print(f"Converting {input_path} to {output_path} (format: {job.source_format} -> {job.target_format})")
+            
+            # For PDF to image conversions, we need to pass the image format to the converter
+            # even though the output file will be a ZIP
+            if job.source_format.upper() == 'PDF' and job.target_format.upper() in ['JPG', 'JPEG', 'PNG']:
+                # Create a temporary output path with the image extension for the converter
+                temp_output = output_path.replace('_pages.zip', f'.{job.target_format.lower()}')
+                success = conversion_service.convert_file(input_path, temp_output, target_format=job.target_format)
+                
+                # If successful, the converter should have created a ZIP file at temp_output
+                # Rename it to the expected output_path
+                if success and os.path.exists(temp_output):
+                    import shutil
+                    shutil.move(temp_output, output_path)
+                    print(f"Moved {temp_output} to {output_path}")
+                elif success:
+                    print(f"Warning: Conversion succeeded but temp file {temp_output} not found")
+                    success = False
+            else:
+                success = conversion_service.convert_file(input_path, output_path)
+            
+            print(f"Conversion result: {success}")
             
             result = {
                 'original_filename': file_info['filename'],
@@ -138,6 +165,7 @@ def process_conversion_job(job):
             
             if not success:
                 result['error'] = f"Failed to convert {file_info['filename']}"
+                print(f"Conversion failed for {file_info['filename']}")
             
             job.results.append(result)
             job.progress = int(((i + 1) / total_files) * 100)
@@ -183,6 +211,16 @@ def upload_files():
         if not files or all(f.filename == '' for f in files):
             return jsonify({'success': False, 'error': 'No files selected'}), 400
         
+        # Check if conversion is supported before processing files
+        is_supported, reason = conversion_service.is_conversion_supported(
+            source_format.lower(), target_format.lower()
+        )
+        if not is_supported:
+            return jsonify({
+                'success': False, 
+                'error': f'Conversion not supported: {reason}'
+            }), 400
+
         # Validate files
         uploaded_files = []
         for file in files:
@@ -285,6 +323,16 @@ def convert_single_file():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No file selected'}), 400
         
+        # Check if conversion is supported before processing
+        is_supported, reason = conversion_service.is_conversion_supported(
+            source_format.lower(), target_format.lower()
+        )
+        if not is_supported:
+            return jsonify({
+                'success': False, 
+                'error': f'Conversion not supported: {reason}'
+            }), 400
+        
         # Validate file
         if not allowed_file(file.filename):
             return jsonify({'success': False, 'error': 'File type not supported'}), 400
@@ -297,11 +345,32 @@ def convert_single_file():
         
         # Prepare output file
         filename_without_ext = Path(filename).stem
-        output_filename = f"{filename_without_ext}.{target_format.lower()}"
-        output_path = os.path.join(CONVERTED_FOLDER, f"{uuid.uuid4()}_{output_filename}")
+        
+        # Special handling for PDF to image conversion (results in ZIP file)
+        if source_format.upper() == 'PDF' and target_format.upper() in ['JPG', 'JPEG', 'PNG']:
+            output_filename = f"{filename_without_ext}_pages.zip"
+            output_path = os.path.join(CONVERTED_FOLDER, f"{uuid.uuid4()}_{output_filename}")
+        else:
+            output_filename = f"{filename_without_ext}.{target_format.lower()}"
+            output_path = os.path.join(CONVERTED_FOLDER, f"{uuid.uuid4()}_{output_filename}")
         
         # Perform conversion
-        success = conversion_service.convert_file(input_path, output_path)
+        if source_format.upper() == 'PDF' and target_format.upper() in ['JPG', 'JPEG', 'PNG']:
+            # Create a temporary output path with the image extension for the converter
+            temp_output = output_path.replace('_pages.zip', f'.{target_format.lower()}')
+            success = conversion_service.convert_file(input_path, temp_output, target_format=target_format)
+            
+            # If successful, the converter should have created a ZIP file at temp_output
+            # Rename it to the expected output_path
+            if success and os.path.exists(temp_output):
+                import shutil
+                shutil.move(temp_output, output_path)
+                print(f"Moved {temp_output} to {output_path}")
+            elif success:
+                print(f"Warning: Conversion succeeded but temp file {temp_output} not found")
+                success = False
+        else:
+            success = conversion_service.convert_file(input_path, output_path)
         
         if success:
             return jsonify({

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../contexts/AppContext';
 import { useConversion } from '../hooks/useConversion';
+import { isMultiPageConversion } from '../data/conversions';
 import Button from './ui/Button';
 import Card from './ui/Card';
 
@@ -86,11 +87,16 @@ const ConversionResults = () => {
 };
 
 const ResultItem = ({ result, onDownload }) => {
+  const { state } = useApp();
   const { originalFile, convertedFileName, size, success, error } = result;
   
   // Handle cases where originalFile might be undefined
   const originalFileName = originalFile?.name || 'Unknown file';
   const originalFileSize = originalFile?.size || 0;
+  
+  // Check if this is a PDF to image conversion (results in ZIP)
+  const isZipResult = isMultiPageConversion(state.sourceFormat, state.targetFormat) && 
+                     convertedFileName?.endsWith('.zip');
   
   return (
     <div className={`flex items-center space-x-4 p-4 rounded-xl border ${
@@ -122,11 +128,18 @@ const ResultItem = ({ result, onDownload }) => {
             {originalFileName}
           </p>
           <span className="text-gray-400">→</span>
-          <p className={`text-sm font-medium truncate ${
-            success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-          }`}>
-            {success ? convertedFileName : 'Failed'}
-          </p>
+          <div className="flex items-center space-x-2">
+            <p className={`text-sm font-medium truncate ${
+              success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+            }`}>
+              {success ? convertedFileName : 'Failed'}
+            </p>
+            {isZipResult && success && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                📦 Multi-page
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
@@ -134,14 +147,25 @@ const ResultItem = ({ result, onDownload }) => {
           {success && size && (
             <>
               <span>•</span>
-              <span>Converted: {formatFileSize(size)}</span>
-              {originalFileSize > 0 && (
+              <span>
+                {isZipResult ? 'ZIP Archive: ' : 'Converted: '}
+                {formatFileSize(size)}
+              </span>
+              {originalFileSize > 0 && !isZipResult && (
                 <>
                   <span>•</span>
                   <span className={`font-medium ${
                     size < originalFileSize ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'
                   }`}>
                     {size < originalFileSize ? 'Smaller' : 'Larger'} ({Math.round(((size - originalFileSize) / originalFileSize) * 100)}%)
+                  </span>
+                </>
+              )}
+              {isZipResult && (
+                <>
+                  <span>•</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-medium">
+                    Contains {state.targetFormat} images for each page
                   </span>
                 </>
               )}
