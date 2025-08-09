@@ -8,16 +8,9 @@
     <div id="results"></div>
     
     <script>
-        // Test the API configuration logic
+        // Test the API configuration logic (Production mode)
         const getApiBaseUrl = () => {
-            // Check if we're in development mode (localhost)
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                // In development, backend runs on port 5000
-                return 'http://localhost:5000/api';
-            }
-            
-            // In production (Railway), backend serves frontend and API on same domain
-            return `${window.location.origin}/api`;
+            return 'https://filealchemy-production.up.railway.app/api';
         };
         
         const API_BASE_URL = getApiBaseUrl();
