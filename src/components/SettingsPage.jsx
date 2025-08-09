@@ -66,7 +66,6 @@ const SettingsPage = ({ history, onClearHistory }) => {
   };
 
   const clearAllData = () => {
-    localStorage.clear();
     onClearHistory();
     dispatch({ type: actions.CLEAR_NOTIFICATIONS });
     dispatch({
@@ -181,49 +180,28 @@ const SettingsPage = ({ history, onClearHistory }) => {
             )}
           </Card>
 
-          {/* Storage & Data */}
+          {/* Data Management */}
           <Card className="p-6">
             <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
-              Storage & Data
+              Data Management
             </h2>
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">
-                    Local Storage Usage
+                  <h3 className="font-medium text-gray-900 dark:text-white text-red-700 dark:text-red-400">
+                    Clear All Data
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Data stored in your browser
+                    Remove all conversion history and notifications
                   </p>
                 </div>
-                <div className="text-right">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {Math.round((JSON.stringify(localStorage).length / 1024))} KB
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    of browser storage
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white text-red-700 dark:text-red-400">
-                      Clear All Data
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Remove all settings, history, and preferences
-                    </p>
-                  </div>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setShowClearConfirm(true)}
-                  >
-                    Clear Data
-                  </Button>
-                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setShowClearConfirm(true)}
+                >
+                  Clear Data
+                </Button>
               </div>
             </div>
           </Card>

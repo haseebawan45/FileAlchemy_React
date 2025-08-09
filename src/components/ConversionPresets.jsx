@@ -12,18 +12,8 @@ const ConversionPresets = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
 
-  // Load presets from localStorage
-  useEffect(() => {
-    const savedPresets = localStorage.getItem('filealchemy-presets');
-    if (savedPresets) {
-      setPresets(JSON.parse(savedPresets));
-    }
-  }, []);
-
-  // Save presets to localStorage
-  useEffect(() => {
-    localStorage.setItem('filealchemy-presets', JSON.stringify(presets));
-  }, [presets]);
+  // Note: Presets are now stored only in component state
+  // For persistent presets, integrate with Firestore user preferences
 
   const defaultPresets = [
     {

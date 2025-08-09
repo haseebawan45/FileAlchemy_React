@@ -311,24 +311,17 @@ export const useConversionHistory = (limitCount = 50) => {
 };
 
 /**
- * Hook for user analytics with caching
+ * Hook for user analytics without caching
  */
 export const useUserAnalytics = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
 
-  const loadAnalytics = async (forceRefresh = false) => {
+  const loadAnalytics = async () => {
     if (!user) {
       setAnalytics(null);
-      return;
-    }
-
-    // Use cache if data is less than 5 minutes old
-    const cacheAge = lastUpdated ? Date.now() - lastUpdated : Infinity;
-    if (!forceRefresh && cacheAge < 5 * 60 * 1000 && analytics) {
       return;
     }
 
@@ -340,7 +333,6 @@ export const useUserAnalytics = () => {
 
       if (result.success) {
         setAnalytics(result.data);
-        setLastUpdated(Date.now());
       } else {
         throw new Error(result.error);
       }
@@ -361,8 +353,7 @@ export const useUserAnalytics = () => {
     analytics,
     loading,
     error,
-    refreshAnalytics: () => loadAnalytics(true),
-    lastUpdated
+    refreshAnalytics: loadAnalytics
   };
 };
 
