@@ -16,7 +16,7 @@ import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import TermsOfServicePage from './components/TermsOfServicePage';
 import AllFormatsPage from './components/AllFormatsPage';
 import Notifications from './components/ui/Notifications';
-import PWAInstallPrompt, { PWAServiceWorker } from './components/PWAInstallPrompt';
+
 
 // Main App Content Component that uses Auth Context
 function AppContent() {
@@ -179,7 +179,6 @@ function AppContent() {
       )}
 
       <main className="flex-1">
-        <PWAInstallPrompt />
         {renderCurrentView()}
       </main>
 
@@ -188,9 +187,6 @@ function AppContent() {
 
       {/* Global Notifications */}
       <Notifications />
-
-      {/* PWA Service Worker */}
-      <PWAServiceWorker />
     </div>
   );
 }
