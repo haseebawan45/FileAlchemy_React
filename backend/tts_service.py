@@ -52,13 +52,18 @@ class TTSService:
                         except Exception as default_error:
                             print(f"⚠️  default driver failed: {default_error}")
                             
-                            # Strategy 3: Try with dummy driver for testing
+                            # Strategy 3: Force eSpeak to work by setting environment
                             try:
-                                self.engine = pyttsx3.init(driverName='dummy')
-                                print("⚠️  TTS Engine initialized with dummy driver (no audio output)")
-                            except Exception as dummy_error:
-                                print(f"❌ All TTS drivers failed: {dummy_error}")
-                                raise dummy_error
+                                # Set environment variables to help eSpeak work
+                                os.environ['ALSA_CARD'] = '0'
+                                os.environ['PULSE_RUNTIME_PATH'] = '/tmp'
+                                self.engine = pyttsx3.init(driverName='espeak')
+                                print("✅ TTS Engine initialized with eSpeak (forced)")
+                            except Exception as forced_error:
+                                print(f"❌ All TTS drivers failed: {forced_error}")
+                                # As last resort, create a minimal working engine
+                                self.engine = None
+                                raise forced_error
                 else:
                     # Windows/macOS - use default driver
                     self.engine = pyttsx3.init()
@@ -302,11 +307,15 @@ class TTSService:
                 if platform.system() == 'Linux':
                     try:
                         temp_engine = pyttsx3.init(driverName='espeak')
-                    except:
+                        print("✅ Using eSpeak driver for conversion")
+                    except Exception as espeak_error:
+                        print(f"⚠️  eSpeak driver failed: {espeak_error}")
                         try:
                             temp_engine = pyttsx3.init()
-                        except:
-                            temp_engine = pyttsx3.init(driverName='dummy')
+                            print("✅ Using default driver for conversion")
+                        except Exception as default_error:
+                            print(f"❌ All drivers failed: {default_error}")
+                            raise default_error
                 else:
                     temp_engine = pyttsx3.init()
                 
@@ -359,9 +368,33 @@ class TTSService:
                 
                 # Convert text to speech
                 print(f"🎵 Saving TTS to file...")
-                temp_engine.save_to_file(text, output_path)
-                temp_engine.runAndWait()
-                print(f"✅ TTS conversion completed")
+                try:
+                    temp_engine.save_to_file(text, output_path)
+                    temp_engine.runAndWait()
+                    print(f"✅ TTS conversion completed")
+                except Exception as save_error:
+                    print(f"⚠️  pyttsx3 save failed: {save_error}")
+                    # Fallback to direct eSpeak command
+                    print(f"🔄 Trying direct eSpeak command...")
+                    import subprocess
+                    try:
+                        subprocess.run([
+                            'espeak',
+                            '-w', output_path,  # Write to WAV file
+                            '-s', str(rate or 200),  # Speed
+                            '-a', str(int((volume or 0.9) * 200)),  # Amplitude (0-200)
+                            text
+                        ], check=True, timeout=30)
+                        print(f"✅ Direct eSpeak conversion completed")
+                    except subprocess.CalledProcessError as cmd_error:
+                        print(f"❌ Direct eSpeak failed: {cmd_error}")
+                        raise cmd_error
+                    except FileNotFoundError:
+                        print(f"❌ eSpeak command not found")
+                        raise Exception("eSpeak not available")
+                    except subprocess.TimeoutExpired:
+                        print(f"❌ eSpeak command timed out")
+                        raise Exception("eSpeak timed out")
                 
                 return "Success"
                 
