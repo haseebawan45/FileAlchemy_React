@@ -87,7 +87,7 @@ class TTSService:
             self.is_initialized = False
     
     def _get_available_voices(self) -> List[Dict]:
-        """Get list of available voices"""
+        """Get list of available voices with better Linux/eSpeak support"""
         if not self.engine:
             return []
         
@@ -96,20 +96,52 @@ class TTSService:
             engine_voices = self.engine.getProperty('voices')
             if engine_voices:
                 for i, voice in enumerate(engine_voices):
+                    # Handle different voice object structures
+                    voice_id = getattr(voice, 'id', f'voice_{i}')
+                    voice_name = getattr(voice, 'name', f'Voice {i}')
+                    
+                    # Clean up voice names for better display
+                    if voice_name and '+' in voice_name:
+                        # eSpeak voices often have format like "english+f3" or "english+m1"
+                        parts = voice_name.split('+')
+                        if len(parts) >= 2:
+                            lang = parts[0].title()
+                            variant = parts[1]
+                            if 'f' in variant.lower():
+                                voice_name = f"{lang} Female"
+                            elif 'm' in variant.lower():
+                                voice_name = f"{lang} Male"
+                            else:
+                                voice_name = f"{lang} {variant}"
+                    
                     voices.append({
-                        'id': voice.id,
-                        'name': voice.name,
+                        'id': str(voice_id),  # Ensure ID is string
+                        'name': voice_name,
                         'gender': getattr(voice, 'gender', 'unknown'),
                         'age': getattr(voice, 'age', 'unknown'),
-                        'languages': getattr(voice, 'languages', []),
+                        'languages': getattr(voice, 'languages', ['en']),
                         'index': i
                     })
+                    
+                    print(f"🎤 Voice {i}: {voice_name} (ID: {voice_id})")
+                    
         except Exception as e:
             print(f"Warning: Could not get voice details: {e}")
-            # Fallback - at least we know there's a default voice
+            # Fallback - create a default voice entry
             voices.append({
-                'id': 'default',
+                'id': '0',
                 'name': 'Default Voice',
+                'gender': 'unknown',
+                'age': 'unknown',
+                'languages': ['en'],
+                'index': 0
+            })
+        
+        if not voices:
+            # Ultimate fallback
+            voices.append({
+                'id': '0',
+                'name': 'System Default',
                 'gender': 'unknown',
                 'age': 'unknown',
                 'languages': ['en'],
@@ -155,7 +187,7 @@ class TTSService:
     def set_voice_properties(self, rate: Optional[int] = None, 
                            volume: Optional[float] = None, 
                            voice_id: Optional[str] = None) -> bool:
-        """Set voice properties"""
+        """Set voice properties with better error handling"""
         if not self.is_initialized or not self.engine:
             return False
         
@@ -164,29 +196,62 @@ class TTSService:
                 if rate is not None:
                     # Typical range: 100-300 words per minute
                     rate = max(50, min(400, rate))
-                    self.engine.setProperty('rate', rate)
+                    try:
+                        self.engine.setProperty('rate', rate)
+                    except Exception as e:
+                        print(f"Warning: Could not set rate to {rate}: {e}")
                 
                 if volume is not None:
                     # Volume range: 0.0 to 1.0
                     volume = max(0.0, min(1.0, volume))
-                    self.engine.setProperty('volume', volume)
+                    try:
+                        self.engine.setProperty('volume', volume)
+                    except Exception as e:
+                        print(f"Warning: Could not set volume to {volume}: {e}")
                 
-                if voice_id is not None:
-                    # Find voice by ID or index
-                    voices = self.engine.getProperty('voices')
-                    if voices:
-                        for voice in voices:
-                            if voice.id == voice_id:
-                                self.engine.setProperty('voice', voice.id)
-                                break
+                if voice_id is not None and voice_id != '' and voice_id != 'default':
+                    try:
+                        voices = self.engine.getProperty('voices')
+                        if voices:
+                            voice_set = False
+                            
+                            # Try to find voice by ID first
+                            for voice in voices:
+                                if voice.id == voice_id:
+                                    self.engine.setProperty('voice', voice.id)
+                                    voice_set = True
+                                    print(f"✅ Set voice to: {voice.name}")
+                                    break
+                            
+                            # If not found by ID, try by index
+                            if not voice_set:
+                                try:
+                                    voice_index = int(voice_id)
+                                    if 0 <= voice_index < len(voices):
+                                        self.engine.setProperty('voice', voices[voice_index].id)
+                                        voice_set = True
+                                        print(f"✅ Set voice by index {voice_index}: {voices[voice_index].name}")
+                                except (ValueError, IndexError):
+                                    pass
+                            
+                            # If still not set, try to find a working voice
+                            if not voice_set and voices:
+                                for i, voice in enumerate(voices):
+                                    try:
+                                        self.engine.setProperty('voice', voice.id)
+                                        print(f"✅ Fallback to voice {i}: {voice.name}")
+                                        voice_set = True
+                                        break
+                                    except Exception as voice_error:
+                                        print(f"⚠️  Voice {i} failed: {voice_error}")
+                                        continue
+                            
+                            if not voice_set:
+                                print(f"⚠️  Could not set any voice, using default")
                         else:
-                            # Try by index if ID not found
-                            try:
-                                voice_index = int(voice_id)
-                                if 0 <= voice_index < len(voices):
-                                    self.engine.setProperty('voice', voices[voice_index].id)
-                            except (ValueError, IndexError):
-                                pass
+                            print(f"⚠️  No voices available")
+                    except Exception as e:
+                        print(f"Warning: Could not set voice {voice_id}: {e}")
             
             return True
         except Exception as e:
@@ -252,21 +317,35 @@ class TTSService:
                 else:
                     temp_engine.setProperty('volume', 0.9)  # Default volume
                 
-                if voice_id is not None:
-                    voices = temp_engine.getProperty('voices')
-                    if voices:
-                        for voice in voices:
-                            if voice.id == voice_id:
-                                temp_engine.setProperty('voice', voice.id)
-                                break
-                        else:
-                            # Try by index if ID not found
-                            try:
-                                voice_index = int(voice_id)
-                                if 0 <= voice_index < len(voices):
-                                    temp_engine.setProperty('voice', voices[voice_index].id)
-                            except (ValueError, IndexError):
-                                pass
+                if voice_id is not None and voice_id != '' and voice_id != 'default':
+                    try:
+                        voices = temp_engine.getProperty('voices')
+                        if voices:
+                            voice_set = False
+                            
+                            # Try to find voice by ID first
+                            for voice in voices:
+                                if voice.id == voice_id:
+                                    temp_engine.setProperty('voice', voice.id)
+                                    voice_set = True
+                                    break
+                            
+                            # If not found by ID, try by index
+                            if not voice_set:
+                                try:
+                                    voice_index = int(voice_id)
+                                    if 0 <= voice_index < len(voices):
+                                        temp_engine.setProperty('voice', voices[voice_index].id)
+                                        voice_set = True
+                                except (ValueError, IndexError):
+                                    pass
+                            
+                            # If still not set, use first available voice
+                            if not voice_set and voices:
+                                temp_engine.setProperty('voice', voices[0].id)
+                    except Exception as voice_error:
+                        print(f"Warning: Could not set voice {voice_id}: {voice_error}")
+                        # Continue with default voice
                 
                 # Ensure output directory exists
                 output_dir = os.path.dirname(output_path)
@@ -339,21 +418,35 @@ class TTSService:
                 else:
                     temp_engine.setProperty('volume', 0.9)
                 
-                if voice_id is not None:
-                    voices = temp_engine.getProperty('voices')
-                    if voices:
-                        for voice in voices:
-                            if voice.id == voice_id:
-                                temp_engine.setProperty('voice', voice.id)
-                                break
-                        else:
-                            # Try by index if ID not found
-                            try:
-                                voice_index = int(voice_id)
-                                if 0 <= voice_index < len(voices):
-                                    temp_engine.setProperty('voice', voices[voice_index].id)
-                            except (ValueError, IndexError):
-                                pass
+                if voice_id is not None and voice_id != '' and voice_id != 'default':
+                    try:
+                        voices = temp_engine.getProperty('voices')
+                        if voices:
+                            voice_set = False
+                            
+                            # Try to find voice by ID first
+                            for voice in voices:
+                                if voice.id == voice_id:
+                                    temp_engine.setProperty('voice', voice.id)
+                                    voice_set = True
+                                    break
+                            
+                            # If not found by ID, try by index
+                            if not voice_set:
+                                try:
+                                    voice_index = int(voice_id)
+                                    if 0 <= voice_index < len(voices):
+                                        temp_engine.setProperty('voice', voices[voice_index].id)
+                                        voice_set = True
+                                except (ValueError, IndexError):
+                                    pass
+                            
+                            # If still not set, use first available voice
+                            if not voice_set and voices:
+                                temp_engine.setProperty('voice', voices[0].id)
+                    except Exception as voice_error:
+                        print(f"Warning: Could not set voice {voice_id}: {voice_error}")
+                        # Continue with default voice
                 
                 # Speak the text
                 print(f"🎵 Playing speech preview...")
