@@ -1,4 +1,15 @@
-/* Custom slider styles for TTS page */
+/* TTS Page Custom Styles */
+
+/* Voice selection dropdown with enhanced styling */
+.voice-select-enhanced {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* Slider custom styling */
 .slider {
   -webkit-appearance: none;
   appearance: none;
@@ -12,19 +23,24 @@
   border-radius: 4px;
 }
 
+.dark .slider::-webkit-slider-track {
+  background: #374151;
+}
+
 .slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  background: #2563eb;
+  background: #3b82f6;
   height: 20px;
   width: 20px;
   border-radius: 50%;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .slider::-webkit-slider-thumb:hover {
-  background: #1d4ed8;
+  background: #2563eb;
+  transform: scale(1.1);
 }
 
 .slider::-moz-range-track {
@@ -34,25 +50,146 @@
   border: none;
 }
 
+.dark .slider::-moz-range-track {
+  background: #374151;
+}
+
 .slider::-moz-range-thumb {
-  background: #2563eb;
+  background: #3b82f6;
   height: 20px;
   width: 20px;
   border-radius: 50%;
   cursor: pointer;
   border: none;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .slider::-moz-range-thumb:hover {
-  background: #1d4ed8;
+  background: #2563eb;
+  transform: scale(1.1);
 }
 
-/* Dark mode styles */
-.dark .slider::-webkit-slider-track {
-  background: #374151;
+/* Voice test button animation */
+.voice-test-btn {
+  transition: all 0.3s ease;
 }
 
-.dark .slider::-moz-range-track {
-  background: #374151;
+.voice-test-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Premium voice indicator */
+.premium-voice-indicator {
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* Conversion result animation */
+.conversion-result {
+  animation: slideInUp 0.5s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Recent conversions hover effect */
+.recent-conversion-item {
+  transition: all 0.2s ease;
+}
+
+.recent-conversion-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .recent-conversion-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Feature showcase gradient */
+.feature-showcase {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+.dark .feature-showcase {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+}
+
+/* Voice quality badge */
+.quality-badge {
+  background: linear-gradient(45deg, #10b981, #059669);
+  color: white;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Loading spinner for voice test */
+.voice-test-spinner {
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Enhanced text area */
+.tts-textarea {
+  transition: all 0.3s ease;
+  resize: vertical;
+  min-height: 160px;
+}
+
+.tts-textarea:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+}
+
+/* Voice info card */
+.voice-info-card {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #93c5fd;
+}
+
+.dark .voice-info-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Service status indicators */
+.service-online {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border: 1px solid #6ee7b7;
+}
+
+.dark .service-online {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.service-offline {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border: 1px solid #f87171;
+}
+
+.dark .service-offline {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }

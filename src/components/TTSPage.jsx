@@ -20,6 +20,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
   const [result, setResult] = useState(null);
   const [serviceHealth, setServiceHealth] = useState(null);
   const [recentConversions, setRecentConversions] = useState([]);
+  const [voiceFilter, setVoiceFilter] = useState('all');
   
   const { dispatch, actions } = useApp();
   const { user } = useAuth();
@@ -204,14 +205,12 @@ const TTSPage = ({ onBack, onNavigate }) => {
   };
 
   const handlePreview = async () => {
-    const validation = ttsService.validateText(text);
+    // Use test text if no text is entered, otherwise use the entered text
+    const testText = text.trim() || "Hello! This is a preview of the selected voice using Google's advanced text-to-speech technology.";
+    
+    const validation = ttsService.validateText(testText);
     if (!validation.valid) {
       addNotification('error', validation.error);
-      return;
-    }
-
-    if (validation.text.length > 500) {
-      addNotification('error', 'Preview text too long (max 500 characters)');
       return;
     }
 
@@ -229,7 +228,8 @@ const TTSPage = ({ onBack, onNavigate }) => {
     try {
       setIsPreviewing(true);
       await ttsService.previewSpeech(validation.text, optionsValidation.options);
-      addNotification('success', 'Speech preview completed');
+      const voiceName = voices.find(v => v.id === selectedVoice || v.index?.toString() === selectedVoice)?.name || 'Selected voice';
+      addNotification('success', `${voiceName} preview completed`);
     } catch (error) {
       console.error('Preview error:', error);
       addNotification('error', error.message || 'Preview failed');
@@ -306,6 +306,34 @@ const TTSPage = ({ onBack, onNavigate }) => {
     return voice.name || `Voice ${voice.index}`;
   };
 
+  // Group voices by language for better organization
+  const getGroupedVoices = () => {
+    if (!voices.length) return {};
+    
+    const grouped = {};
+    voices.forEach(voice => {
+      const language = voice.language || 'unknown';
+      if (!grouped[language]) {
+        grouped[language] = [];
+      }
+      grouped[language].push(voice);
+    });
+    
+    return grouped;
+  };
+
+  // Get filtered voices based on selected filter
+  const getFilteredVoices = () => {
+    if (voiceFilter === 'all') return voices;
+    return voices.filter(voice => voice.language === voiceFilter);
+  };
+
+  // Get unique languages for filter dropdown
+  const getAvailableLanguages = () => {
+    const languages = [...new Set(voices.map(voice => voice.language))];
+    return languages.sort();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
@@ -355,19 +383,42 @@ const TTSPage = ({ onBack, onNavigate }) => {
         </div>
 
         {/* Service Health Status */}
-        {serviceHealth && !serviceHealth.success && (
-          <Card className="mb-6 border-red-200 dark:border-red-800">
+        {serviceHealth && (
+          <Card className={`mb-6 ${serviceHealth.success ? 'border-green-200 dark:border-green-800' : 'border-red-200 dark:border-red-800'}`}>
             <div className="p-4">
               <div className="flex items-center">
-                <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mr-3">
-                  <svg className="w-5 h-5 text-red-500 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
+                <div className={`w-10 h-10 ${serviceHealth.success ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'} rounded-full flex items-center justify-center mr-3`}>
+                  {serviceHealth.success ? (
+                    <svg className="w-5 h-5 text-green-500 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-red-500 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  )}
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Service Unavailable</h3>
-                  <p className="text-sm text-red-700 dark:text-red-300">TTS service is not available: {serviceHealth.error}</p>
+                <div className="flex-1">
+                  <h3 className={`text-sm font-medium ${serviceHealth.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                    {serviceHealth.success ? 'Google TTS Service Online' : 'Service Unavailable'}
+                  </h3>
+                  <p className={`text-sm ${serviceHealth.success ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                    {serviceHealth.success 
+                      ? `${serviceHealth.engine || 'Google Text-to-Speech'} initialized with ${voices.length} premium voices`
+                      : `TTS service is not available: ${serviceHealth.error}`
+                    }
+                  </p>
                 </div>
+                {serviceHealth.success && (
+                  <div className="text-right">
+                    <div className="text-xs text-green-600 dark:text-green-400 font-medium">
+                      {serviceHealth.quality || 'High'} Quality
+                    </div>
+                    <div className="text-xs text-green-500 dark:text-green-500">
+                      Neural TTS
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </Card>
@@ -402,6 +453,81 @@ const TTSPage = ({ onBack, onNavigate }) => {
           </Card>
         )}
 
+        {/* Feature Showcase */}
+        <Card className="feature-showcase mb-6 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border-green-200 dark:border-green-800">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mr-4">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Premium Google Text-to-Speech</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Professional-grade neural voice synthesis</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="text-center">
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span className="text-lg premium-voice-indicator">🌟</span>
+                </div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{voices.length}+ Premium Voices</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Multiple languages & accents</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span className="text-lg">🧠</span>
+                </div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">Neural Technology</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Human-like speech quality</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span className="text-lg">🌍</span>
+                </div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{getAvailableLanguages().length} Languages</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Global coverage</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <span className="text-lg">⚡</span>
+                </div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">High Quality</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">Crystal clear audio output</div>
+              </div>
+            </div>
+            
+            {/* Language breakdown */}
+            {voices.length > 0 && (
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">Available Languages:</div>
+                <div className="flex flex-wrap gap-2">
+                  {getAvailableLanguages().slice(0, 8).map(lang => {
+                    const count = voices.filter(v => v.language === lang).length;
+                    return (
+                      <span key={lang} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                        {lang.toUpperCase()} ({count})
+                      </span>
+                    );
+                  })}
+                  {getAvailableLanguages().length > 8 && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
+                      +{getAvailableLanguages().length - 8} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
         <Card className="p-8">
           {/* Text Input */}
           <div className="mb-8">
@@ -413,7 +539,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setText("Welcome to FileAlchemy! This is a demonstration of our text-to-speech feature. You can convert any text into natural-sounding speech with customizable voice settings.")}
+                  onClick={() => setText("Welcome to FileAlchemy's premium Text-to-Speech feature! Powered by Google's advanced neural technology, we now offer 20 high-quality voices across multiple languages and regions. Experience crystal-clear, human-like speech synthesis with customizable speed and volume controls. From English with US, UK, Australian, and Canadian accents to Spanish, French, German, and many more languages - our TTS service delivers professional-grade audio perfect for accessibility, education, and content creation.")}
                 >
                   Sample Text
                 </Button>
@@ -431,7 +557,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Enter the text you want to convert to speech..."
-              className="w-full h-40 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors"
+              className="tts-textarea w-full h-40 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-colors"
               maxLength={10000}
             />
             <div className="flex justify-between items-center mt-3 text-sm text-gray-500 dark:text-gray-400">
@@ -454,47 +580,117 @@ const TTSPage = ({ onBack, onNavigate }) => {
                   </svg>
                   ~{Math.ceil(text.trim().split(/\s+/).filter(word => word.length > 0).length / (rate / 60))}s duration
                 </span>
-              </div>
-              {text.length > 500 && (
-                <span className="text-amber-600 dark:text-amber-400 flex items-center">
+                <span className="flex items-center text-green-600 dark:text-green-400">
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Preview limited to 500 characters
+                  Google TTS
                 </span>
-              )}
+              </div>
+
             </div>
           </div>
 
           {/* Voice Settings */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             {/* Voice Selection */}
-            <div>
+            <div className="md:col-span-2">
               <label htmlFor="voice-select" className="block text-sm font-medium text-gray-900 dark:text-white mb-3">
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
-                  Voice
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                    Voice & Language
+                  </div>
+                  {voices.length > 0 && (
+                    <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900 px-2 py-1 rounded-full">
+                      {voices.length} Premium Voices
+                    </span>
+                  )}
                 </div>
               </label>
-              <select
-                id="voice-select"
-                value={selectedVoice}
-                onChange={(e) => setSelectedVoice(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors"
-                disabled={voices.length === 0}
-              >
-                {voices.length === 0 ? (
-                  <option value="">No voices available</option>
-                ) : (
-                  voices.map((voice, index) => (
-                    <option key={voice.id || index} value={voice.id || index.toString()}>
-                      {getVoiceName(voice)} {voice.gender && `(${voice.gender})`}
-                    </option>
-                  ))
+              
+              <div className="space-y-3">
+                {/* Language Filter */}
+                {getAvailableLanguages().length > 1 && (
+                  <select
+                    value={voiceFilter}
+                    onChange={(e) => setVoiceFilter(e.target.value)}
+                    className="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors"
+                  >
+                    <option value="all">All Languages ({voices.length} voices)</option>
+                    {getAvailableLanguages().map(lang => {
+                      const count = voices.filter(v => v.language === lang).length;
+                      const langName = lang.toUpperCase();
+                      return (
+                        <option key={lang} value={lang}>
+                          {langName} ({count} voice{count !== 1 ? 's' : ''})
+                        </option>
+                      );
+                    })}
+                  </select>
                 )}
-              </select>
+                
+                {/* Voice Selection */}
+                <select
+                  id="voice-select"
+                  value={selectedVoice}
+                  onChange={(e) => setSelectedVoice(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white transition-colors"
+                  disabled={voices.length === 0}
+                >
+                  {voices.length === 0 ? (
+                    <option value="">No voices available</option>
+                  ) : (
+                    getFilteredVoices().map((voice, index) => (
+                      <option key={voice.id || index} value={voice.id || index.toString()}>
+                        {getVoiceName(voice)} {voice.quality === 'high' && '🌟'}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              
+              {voices.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Google Neural TTS • High Quality
+                    </div>
+                    <div className="text-primary-500">
+                      {getFilteredVoices().length} of {voices.length} voices shown
+                    </div>
+                  </div>
+                  
+                  {selectedVoice && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handlePreview()}
+                      disabled={isPreviewing || !selectedVoice}
+                      className="w-full text-xs py-2"
+                    >
+                      {isPreviewing ? (
+                        <>
+                          <div className="w-3 h-3 mr-2 animate-spin rounded-full border border-current border-t-transparent"></div>
+                          Testing Voice...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Test Voice
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Speech Rate */}
@@ -555,6 +751,49 @@ const TTSPage = ({ onBack, onNavigate }) => {
             </div>
           </div>
 
+          {/* Selected Voice Info */}
+          {selectedVoice && voices.length > 0 && (
+            <Card className="voice-info-card mb-6 border-blue-200 dark:border-blue-800">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mr-3">
+                      <svg className="w-5 h-5 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        Selected Voice: {(() => {
+                          const voice = voices.find(v => v.id === selectedVoice || v.index?.toString() === selectedVoice);
+                          return voice ? getVoiceName(voice) : 'Default';
+                        })()}
+                      </h3>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        {(() => {
+                          const voice = voices.find(v => v.id === selectedVoice || v.index?.toString() === selectedVoice);
+                          if (!voice) return 'Google Neural TTS';
+                          const parts = [];
+                          if (voice.language) parts.push(`Language: ${voice.language.toUpperCase()}`);
+                          if (voice.quality) parts.push(`Quality: ${voice.quality}`);
+                          return parts.join(' • ') || 'Google Neural TTS';
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                      🌟 Premium Voice
+                    </div>
+                    <div className="text-xs text-blue-500 dark:text-blue-500">
+                      Neural Technology
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 mb-8">
             <Button
@@ -592,7 +831,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
 
           {/* Result */}
           {result && (
-            <Card className="mb-8 border-green-200 dark:border-green-800">
+            <Card className="conversion-result mb-8 border-green-200 dark:border-green-800">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center">
@@ -608,7 +847,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                   <div className="flex items-center">
                     <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -625,6 +864,20 @@ const TTSPage = ({ onBack, onNavigate }) => {
                     <div>
                       <span className="text-sm text-gray-600 dark:text-gray-400">Text Length</span>
                       <div className="font-medium text-gray-900 dark:text-white">{result.text_length} characters</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                    <div>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Voice Engine</span>
+                      <div className="font-medium text-gray-900 dark:text-white flex items-center">
+                        Google TTS 
+                        <span className="ml-1 text-xs bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">
+                          Neural
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -676,10 +929,16 @@ const TTSPage = ({ onBack, onNavigate }) => {
                 
                 <div className="space-y-4">
                   {recentConversions.map((conversion) => (
-                    <div key={conversion.id} className="bg-gray-50 dark:bg-gray-700 rounded-2xl p-4 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                    <div key={conversion.id} className="recent-conversion-item bg-gray-50 dark:bg-gray-700 rounded-2xl p-4 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
                       <div className="flex-1">
                         <p className="text-sm text-gray-900 dark:text-white font-medium mb-2">{conversion.text}</p>
                         <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
+                          <span className="flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {conversion.timestamp}
+                          </span>
                           <span className="flex items-center">
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -694,63 +953,45 @@ const TTSPage = ({ onBack, onNavigate }) => {
                           </span>
                           <span className="flex items-center">
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                             </svg>
-                            {conversion.rate} WPM
-                          </span>
-                          <span className="flex items-center">
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728" />
-                            </svg>
-                            {Math.round(conversion.volume * 100)}%
-                          </span>
-                          <span className="flex items-center">
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {conversion.timestamp}
+                            {conversion.size ? formatFileSize(conversion.size) : 'N/A'}
                           </span>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const downloadUrl = ttsService.getDownloadUrl(conversion.filename);
-                          const link = document.createElement('a');
-                          link.href = downloadUrl;
-                          link.download = conversion.filename;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        className="ml-4"
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Download
-                      </Button>
+                      <div className="flex items-center space-x-2">
+                        <div className="text-xs bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 px-2 py-1 rounded-full">
+                          Google TTS
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (conversion.filename) {
+                              const downloadUrl = ttsService.getDownloadUrl(conversion.filename);
+                              const link = document.createElement('a');
+                              link.href = downloadUrl;
+                              link.download = conversion.filename;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }
+                          }}
+                          className="text-xs"
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             </Card>
           )}
-
         </Card>
-
-        {/* Service Info */}
-        {serviceHealth && serviceHealth.success && (
-          <div className="text-center">
-            <div className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                TTS Service: {serviceHealth.health?.voices_available || 0} voices available
-              </span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
