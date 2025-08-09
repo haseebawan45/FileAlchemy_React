@@ -24,15 +24,9 @@ function AppContent() {
   const [conversionHistory, setConversionHistory] = useState([]);
   const { user, trackConversion } = useAuth();
 
-  // Load history from localStorage and Firestore
+  // Load history from Firestore
   useEffect(() => {
     const loadHistory = async () => {
-      // Load from localStorage first for immediate display
-      const savedHistory = localStorage.getItem('filealchemy-history');
-      if (savedHistory) {
-        setConversionHistory(JSON.parse(savedHistory));
-      }
-
       // If user is authenticated, load from Firestore
       if (user) {
         try {
@@ -53,23 +47,19 @@ function AppContent() {
               firestoreData: record
             }));
             
-            // Merge with localStorage data, prioritizing Firestore
-            const mergedHistory = [...firestoreHistory];
-            setConversionHistory(mergedHistory);
+            setConversionHistory(firestoreHistory);
           }
         } catch (error) {
           console.error('Error loading Firestore history:', error);
         }
+      } else {
+        // Clear history when user logs out
+        setConversionHistory([]);
       }
     };
 
     loadHistory();
   }, [user]); // Re-run when user changes
-
-  // Save history to localStorage
-  useEffect(() => {
-    localStorage.setItem('filealchemy-history', JSON.stringify(conversionHistory));
-  }, [conversionHistory]);
 
   const handleCategorySelect = () => {
     setCurrentView('conversion');

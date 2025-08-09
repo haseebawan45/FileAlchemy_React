@@ -1,11 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
-// Get initial dark mode from localStorage or system preference
+// Get initial dark mode from system preference
 const getInitialDarkMode = () => {
-  const saved = localStorage.getItem('filealchemy-darkmode');
-  if (saved !== null) {
-    return saved === 'true';
-  }
   // Check system preference
   if (typeof window !== 'undefined') {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,12 +9,8 @@ const getInitialDarkMode = () => {
   return false;
 };
 
-// Get initial notification setting from localStorage
+// Get initial notification setting
 const getInitialNotificationSetting = () => {
-  const saved = localStorage.getItem('filealchemy-notifications');
-  if (saved !== null) {
-    return saved === 'true';
-  }
   return true; // Default to enabled
 };
 
@@ -215,20 +207,14 @@ export function AppProvider({ children }) {
     }
   }, []); // Empty dependency array - runs only once
 
-  // Update localStorage and document class when dark mode changes
+  // Update document class when dark mode changes
   useEffect(() => {
-    localStorage.setItem('filealchemy-darkmode', state.darkMode.toString());
     if (state.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
   }, [state.darkMode]);
-
-  // Update localStorage when notification setting changes
-  useEffect(() => {
-    localStorage.setItem('filealchemy-notifications', state.notificationsEnabled.toString());
-  }, [state.notificationsEnabled]);
 
   // Auto-remove notifications after 5 seconds
   useEffect(() => {
