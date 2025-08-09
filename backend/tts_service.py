@@ -10,9 +10,19 @@ import tempfile
 import threading
 import time
 import signal
+import platform
 from pathlib import Path
 import pyttsx3
 from typing import Dict, List, Optional, Tuple
+
+# Set up audio environment for Linux servers
+if platform.system() == 'Linux':
+    # Set PULSE_RUNTIME_PATH to avoid pulseaudio warnings
+    os.environ.setdefault('PULSE_RUNTIME_PATH', '/tmp/pulse-runtime')
+    # Set ALSA_CARD to use default audio device
+    os.environ.setdefault('ALSA_CARD', '0')
+    # Disable audio output for headless servers
+    os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
 
 class TTSService:
     def __init__(self):
@@ -26,12 +36,54 @@ class TTSService:
         """Initialize the TTS engine with error handling"""
         try:
             with self.lock:
-                self.engine = pyttsx3.init()
+                # Try different initialization strategies based on platform
+                if platform.system() == 'Linux':
+                    # Strategy 1: Try espeak driver explicitly
+                    try:
+                        self.engine = pyttsx3.init(driverName='espeak')
+                        print("✅ TTS Engine initialized with espeak driver")
+                    except Exception as espeak_error:
+                        print(f"⚠️  espeak driver failed: {espeak_error}")
+                        
+                        # Strategy 2: Try default driver
+                        try:
+                            self.engine = pyttsx3.init()
+                            print("✅ TTS Engine initialized with default driver")
+                        except Exception as default_error:
+                            print(f"⚠️  default driver failed: {default_error}")
+                            
+                            # Strategy 3: Try with dummy driver for testing
+                            try:
+                                self.engine = pyttsx3.init(driverName='dummy')
+                                print("⚠️  TTS Engine initialized with dummy driver (no audio output)")
+                            except Exception as dummy_error:
+                                print(f"❌ All TTS drivers failed: {dummy_error}")
+                                raise dummy_error
+                else:
+                    # Windows/macOS - use default driver
+                    self.engine = pyttsx3.init()
+                    print("✅ TTS Engine initialized successfully")
+                
+                # Test engine functionality
+                if self.engine:
+                    try:
+                        # Test basic properties
+                        rate = self.engine.getProperty('rate')
+                        volume = self.engine.getProperty('volume')
+                        print(f"📊 Engine properties - Rate: {rate}, Volume: {volume}")
+                    except Exception as prop_error:
+                        print(f"⚠️  Could not get engine properties: {prop_error}")
+                
                 self.available_voices = self._get_available_voices()
                 self.is_initialized = True
-                print("✅ TTS Engine initialized successfully")
+                print(f"🎤 Found {len(self.available_voices)} voices")
+                
         except Exception as e:
             print(f"❌ Failed to initialize TTS engine: {e}")
+            if "eSpeak" in str(e) or "espeak" in str(e) or "ALSA" in str(e):
+                print("💡 This appears to be an audio system issue!")
+                print("💡 On Ubuntu/Debian: sudo apt-get install espeak espeak-data libespeak1")
+                print("💡 For Railway deployment: Check Dockerfile includes audio dependencies")
             self.is_initialized = False
     
     def _get_available_voices(self) -> List[Dict]:
@@ -175,7 +227,15 @@ class TTSService:
             temp_engine = None
             try:
                 print(f"🔊 Creating TTS engine for conversion: {output_path}")
-                temp_engine = pyttsx3.init()
+                
+                # Try to initialize engine with same strategy as main engine
+                if platform.system() == 'Linux':
+                    try:
+                        temp_engine = pyttsx3.init(driverName='espeak')
+                    except:
+                        temp_engine = pyttsx3.init()
+                else:
+                    temp_engine = pyttsx3.init()
                 
                 # Set properties
                 if rate is not None:
