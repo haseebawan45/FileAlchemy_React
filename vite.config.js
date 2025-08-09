@@ -8,5 +8,21 @@ export default defineConfig({
     hmr: {
       overlay: true
     }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+        }
+      }
+    }
+  },
+  preview: {
+    port: 4173,
+    host: true
   }
 })

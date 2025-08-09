@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["python39", "python39Packages.pip", "nodejs-18_x"]
+
+[phases.install]
+cmds = [
+    "python -m pip install -r backend/requirements.txt",
+    "npm install"
+]
+
+[phases.build]
+cmds = [
+    "npm run build"
+]
+
+[start]
+cmd = "python backend/api_server.py"

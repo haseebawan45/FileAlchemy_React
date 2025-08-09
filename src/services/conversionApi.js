@@ -2,7 +2,7 @@
  * API service for file conversion using Python backend
  */
 
-const API_BASE_URL = 'http://localhost:5000/api';
+import { API_BASE_URL } from '../config/api.js';
 
 class ConversionApiError extends Error {
   constructor(message, status = null) {

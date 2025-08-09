@@ -9,15 +9,37 @@ import uuid
 import tempfile
 import shutil
 from pathlib import Path
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from file_converter import FileConversionService
 import threading
 import time
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Load .env file from project root (one level up from backend)
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+    load_dotenv(env_path)
+    print(f"✅ Loaded environment variables from {env_path}")
+except ImportError:
+    print("⚠️  python-dotenv not installed, using system environment variables only")
+except Exception as e:
+    print(f"⚠️  Could not load .env file: {e}")
+
 app = Flask(__name__)
-CORS(app)  # Enable CORS for React frontend
+
+# Configure CORS based on environment
+if os.environ.get('FLASK_ENV') == 'development':
+    CORS(app)  # Allow all origins in development
+else:
+    # In production, be more restrictive with CORS
+    allowed_origins = os.environ.get('ALLOWED_ORIGINS', '').split(',')
+    if allowed_origins and allowed_origins[0]:
+        CORS(app, origins=allowed_origins)
+    else:
+        CORS(app)  # Fallback to allow all if not configured
 
 # Configuration
 UPLOAD_FOLDER = 'temp_uploads'
@@ -180,10 +202,22 @@ def process_conversion_job(job):
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
+    # Check if conversion service is working
+    try:
+        formats = conversion_service.list_supported_formats()
+        service_status = 'healthy'
+    except Exception as e:
+        formats = {}
+        service_status = f'degraded: {str(e)}'
+    
     return jsonify({
-        'status': 'healthy',
+        'status': service_status,
         'service': 'FileAlchemy API',
-        'version': '1.0.0'
+        'version': '1.0.0',
+        'environment': os.environ.get('FLASK_ENV', 'development'),
+        'port': os.environ.get('PORT', '5000'),
+        'supported_formats': len(formats),
+        'frontend_available': os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dist'))
     })
 
 @app.route('/api/formats', methods=['GET'])
@@ -404,6 +438,34 @@ def cleanup_task():
         time.sleep(300)  # Run every 5 minutes
         cleanup_old_files()
 
+# Serve static files (React frontend) in production
+# This route must be AFTER all API routes to avoid conflicts
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve React frontend static files"""
+    # Skip API routes - they should be handled by their specific endpoints
+    if path.startswith('api/'):
+        return jsonify({'error': 'API endpoint not found'}), 404
+    
+    # In production, serve built React files
+    static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dist')
+    
+    if os.path.exists(static_folder):
+        if path != "" and os.path.exists(os.path.join(static_folder, path)):
+            return send_from_directory(static_folder, path)
+        else:
+            # For React Router, serve index.html for all non-API routes
+            return send_from_directory(static_folder, 'index.html')
+    else:
+        # Development mode - return a simple message
+        return jsonify({
+            'message': 'FileAlchemy API Server',
+            'status': 'running',
+            'frontend': 'not built - run npm run build to create production frontend',
+            'note': 'Run "npm run build" to create the production frontend'
+        })
+
 # Start cleanup thread
 cleanup_thread = threading.Thread(target=cleanup_task)
 cleanup_thread.daemon = True
@@ -418,4 +480,9 @@ if __name__ == '__main__':
         print(f"    Input:  {', '.join(format_dict['input'])}")
         print(f"    Output: {', '.join(format_dict['output'])}")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Get port from environment variable (Railway sets PORT automatically)
+    port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
+    
+    print(f"Server starting on port {port}")
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)
