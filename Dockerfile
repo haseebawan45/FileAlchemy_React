@@ -4,15 +4,11 @@ FROM python:3.9-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies including TTS support
+# Install system dependencies including audio processing support
 RUN apt-get update && apt-get install -y \
     curl \
-    espeak \
-    espeak-data \
-    libespeak1 \
-    libespeak-dev \
-    alsa-utils \
-    pulseaudio \
+    ffmpeg \
+    libavcodec-extra \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 18

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Text-to-Speech Service for FileAlchemy
-Provides TTS functionality using pyttsx3
+Provides high-quality TTS functionality using Google Text-to-Speech (gTTS)
 """
 
 import os
@@ -9,457 +9,295 @@ import uuid
 import tempfile
 import threading
 import time
-import signal
-import platform
 from pathlib import Path
-import pyttsx3
 from typing import Dict, List, Optional, Tuple
-
-# Set up audio environment for Linux servers
-if platform.system() == 'Linux':
-    # Set PULSE_RUNTIME_PATH to avoid pulseaudio warnings
-    os.environ.setdefault('PULSE_RUNTIME_PATH', '/tmp/pulse-runtime')
-    # Set ALSA_CARD to use default audio device
-    os.environ.setdefault('ALSA_CARD', '0')
-    # Disable audio output for headless servers
-    os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+import io
 
 class TTSService:
     def __init__(self):
-        self.engine = None
         self.available_voices = []
         self.is_initialized = False
         self.lock = threading.Lock()
-        self._initialize_engine()
+        self.supported_languages = {}
+        self._initialize_service()
     
-    def _initialize_engine(self):
-        """Initialize the TTS engine with error handling"""
+    def _initialize_service(self):
+        """Initialize the Google TTS service"""
         try:
-            with self.lock:
-                # Try different initialization strategies based on platform
-                if platform.system() == 'Linux':
-                    # Strategy 1: Try espeak driver explicitly
-                    try:
-                        self.engine = pyttsx3.init(driverName='espeak')
-                        print("✅ TTS Engine initialized with espeak driver")
-                    except Exception as espeak_error:
-                        print(f"⚠️  espeak driver failed: {espeak_error}")
-                        
-                        # Strategy 2: Try default driver
-                        try:
-                            self.engine = pyttsx3.init()
-                            print("✅ TTS Engine initialized with default driver")
-                        except Exception as default_error:
-                            print(f"⚠️  default driver failed: {default_error}")
-                            
-                            # Strategy 3: Force eSpeak to work by setting environment
-                            try:
-                                # Set environment variables to help eSpeak work
-                                os.environ['ALSA_CARD'] = '0'
-                                os.environ['PULSE_RUNTIME_PATH'] = '/tmp'
-                                self.engine = pyttsx3.init(driverName='espeak')
-                                print("✅ TTS Engine initialized with eSpeak (forced)")
-                            except Exception as forced_error:
-                                print(f"❌ All TTS drivers failed: {forced_error}")
-                                # As last resort, create a minimal working engine
-                                self.engine = None
-                                raise forced_error
-                else:
-                    # Windows/macOS - use default driver
-                    self.engine = pyttsx3.init()
-                    print("✅ TTS Engine initialized successfully")
-                
-                # Test engine functionality
-                if self.engine:
-                    try:
-                        # Test basic properties
-                        rate = self.engine.getProperty('rate')
-                        volume = self.engine.getProperty('volume')
-                        print(f"📊 Engine properties - Rate: {rate}, Volume: {volume}")
-                    except Exception as prop_error:
-                        print(f"⚠️  Could not get engine properties: {prop_error}")
-                
-                self.available_voices = self._get_available_voices()
+            # Try to import gTTS
+            try:
+                from gtts import gTTS
+                self.gtts_available = True
+                print("✅ Google TTS (gTTS) library available")
+            except ImportError:
+                print("⚠️  gTTS library not found, trying to install...")
+                try:
+                    import subprocess
+                    subprocess.check_call(['pip', 'install', 'gtts'])
+                    from gtts import gTTS
+                    self.gtts_available = True
+                    print("✅ Google TTS (gTTS) library installed and imported")
+                except Exception as install_error:
+                    print(f"❌ Failed to install gTTS: {install_error}")
+                    self.gtts_available = False
+            
+            if self.gtts_available:
+                # Initialize supported languages and voices
+                self._initialize_voices()
                 self.is_initialized = True
-                print(f"🎤 Found {len(self.available_voices)} voices")
+                print(f"🎤 Google TTS initialized with {len(self.available_voices)} voices")
+            else:
+                print("❌ Google TTS not available")
+                self.is_initialized = False
                 
         except Exception as e:
-            print(f"❌ Failed to initialize TTS engine: {e}")
-            if "eSpeak" in str(e) or "espeak" in str(e) or "ALSA" in str(e):
-                print("💡 This appears to be an audio system issue!")
-                print("💡 On Ubuntu/Debian: sudo apt-get install espeak espeak-data libespeak1")
-                print("💡 For Railway deployment: Check Dockerfile includes audio dependencies")
+            print(f"❌ Failed to initialize Google TTS service: {e}")
             self.is_initialized = False
     
-    def _get_available_voices(self) -> List[Dict]:
-        """Get list of available voices with better Linux/eSpeak support"""
-        if not self.engine:
-            return []
+    def _initialize_voices(self):
+        """Initialize available Google TTS voices and languages"""
+        # Google TTS supports many languages with high-quality voices
+        # We'll provide a curated list of the most popular ones
+        self.supported_languages = {
+            'en': {'name': 'English', 'tlds': ['com', 'co.uk', 'com.au', 'ca']},
+            'es': {'name': 'Spanish', 'tlds': ['es', 'com.mx']},
+            'fr': {'name': 'French', 'tlds': ['fr', 'ca']},
+            'de': {'name': 'German', 'tlds': ['de']},
+            'it': {'name': 'Italian', 'tlds': ['it']},
+            'pt': {'name': 'Portuguese', 'tlds': ['pt', 'com.br']},
+            'ru': {'name': 'Russian', 'tlds': ['ru']},
+            'ja': {'name': 'Japanese', 'tlds': ['co.jp']},
+            'ko': {'name': 'Korean', 'tlds': ['co.kr']},
+            'zh': {'name': 'Chinese', 'tlds': ['com']},
+            'hi': {'name': 'Hindi', 'tlds': ['co.in']},
+            'ar': {'name': 'Arabic', 'tlds': ['com']},
+            'nl': {'name': 'Dutch', 'tlds': ['nl']},
+            'sv': {'name': 'Swedish', 'tlds': ['se']},
+            'da': {'name': 'Danish', 'tlds': ['dk']},
+            'no': {'name': 'Norwegian', 'tlds': ['no']},
+            'fi': {'name': 'Finnish', 'tlds': ['fi']},
+            'pl': {'name': 'Polish', 'tlds': ['pl']},
+            'tr': {'name': 'Turkish', 'tlds': ['com.tr']},
+            'th': {'name': 'Thai', 'tlds': ['co.th']}
+        }
         
+        # Create voice entries for different accents/regions
         voices = []
-        try:
-            engine_voices = self.engine.getProperty('voices')
-            if engine_voices:
-                for i, voice in enumerate(engine_voices):
-                    # Handle different voice object structures
-                    voice_id = getattr(voice, 'id', f'voice_{i}')
-                    voice_name = getattr(voice, 'name', f'Voice {i}')
-                    
-                    # Clean up voice names for better display
-                    if voice_name and '+' in voice_name:
-                        # eSpeak voices often have format like "english+f3" or "english+m1"
-                        parts = voice_name.split('+')
-                        if len(parts) >= 2:
-                            lang = parts[0].title()
-                            variant = parts[1]
-                            if 'f' in variant.lower():
-                                voice_name = f"{lang} Female"
-                            elif 'm' in variant.lower():
-                                voice_name = f"{lang} Male"
-                            else:
-                                voice_name = f"{lang} {variant}"
-                    
-                    voices.append({
-                        'id': str(voice_id),  # Ensure ID is string
-                        'name': voice_name,
-                        'gender': getattr(voice, 'gender', 'unknown'),
-                        'age': getattr(voice, 'age', 'unknown'),
-                        'languages': getattr(voice, 'languages', ['en']),
-                        'index': i
-                    })
-                    
-                    print(f"🎤 Voice {i}: {voice_name} (ID: {voice_id})")
-                    
-        except Exception as e:
-            print(f"Warning: Could not get voice details: {e}")
-            # Fallback - create a default voice entry
-            voices.append({
-                'id': '0',
-                'name': 'Default Voice',
-                'gender': 'unknown',
-                'age': 'unknown',
-                'languages': ['en'],
-                'index': 0
-            })
+        voice_index = 0
         
-        if not voices:
-            # Ultimate fallback
-            voices.append({
-                'id': '0',
-                'name': 'System Default',
-                'gender': 'unknown',
-                'age': 'unknown',
-                'languages': ['en'],
-                'index': 0
-            })
+        for lang_code, lang_info in self.supported_languages.items():
+            lang_name = lang_info['name']
+            tlds = lang_info['tlds']
+            
+            for tld in tlds:
+                # Determine region/accent name
+                region_name = self._get_region_name(tld)
+                voice_name = f"{lang_name}"
+                if region_name:
+                    voice_name += f" ({region_name})"
+                
+                voices.append({
+                    'id': f"{lang_code}-{tld}",
+                    'name': voice_name,
+                    'language': lang_code,
+                    'tld': tld,
+                    'gender': 'neutral',  # gTTS voices are generally neutral
+                    'age': 'adult',
+                    'languages': [lang_code],
+                    'index': voice_index,
+                    'quality': 'high'
+                })
+                
+                voice_index += 1
+                
+                # Limit to first 20 voices for better UX
+                if voice_index >= 20:
+                    break
+            
+            if voice_index >= 20:
+                break
         
-        return voices
+        self.available_voices = voices
+        
+        # Log available voices
+        for voice in voices[:5]:  # Show first 5
+            print(f"🎤 Voice: {voice['name']} (ID: {voice['id']})")
+        if len(voices) > 5:
+            print(f"🎤 ... and {len(voices) - 5} more voices")
+    
+    def _get_region_name(self, tld: str) -> str:
+        """Get human-readable region name from TLD"""
+        region_map = {
+            'com': 'US',
+            'co.uk': 'UK',
+            'com.au': 'Australia',
+            'ca': 'Canada',
+            'es': 'Spain',
+            'com.mx': 'Mexico',
+            'fr': 'France',
+            'de': 'Germany',
+            'it': 'Italy',
+            'pt': 'Portugal',
+            'com.br': 'Brazil',
+            'ru': 'Russia',
+            'co.jp': 'Japan',
+            'co.kr': 'Korea',
+            'co.in': 'India',
+            'nl': 'Netherlands',
+            'se': 'Sweden',
+            'dk': 'Denmark',
+            'no': 'Norway',
+            'fi': 'Finland',
+            'pl': 'Poland',
+            'com.tr': 'Turkey',
+            'co.th': 'Thailand'
+        }
+        return region_map.get(tld, '')
     
     def get_voices(self) -> Dict:
         """Get available voices for API response"""
         if not self.is_initialized:
-            # Provide fallback voices for direct eSpeak usage
-            fallback_voices = [
-                {
-                    'id': 'en',
-                    'name': 'English Default',
-                    'gender': 'unknown',
-                    'age': 'unknown',
-                    'languages': ['en'],
-                    'index': 0
-                },
-                {
-                    'id': 'en+f3',
-                    'name': 'English Female',
-                    'gender': 'female',
-                    'age': 'unknown',
-                    'languages': ['en'],
-                    'index': 1
-                },
-                {
-                    'id': 'en+m3',
-                    'name': 'English Male',
-                    'gender': 'male',
-                    'age': 'unknown',
-                    'languages': ['en'],
-                    'index': 2
-                }
-            ]
-            
             return {
-                'success': True,
-                'voices': fallback_voices,
-                'default_voice': fallback_voices[0],
-                'note': 'Using direct eSpeak voices (pyttsx3 unavailable)'
+                'success': False,
+                'error': 'Google TTS service not initialized',
+                'voices': []
             }
         
         return {
             'success': True,
             'voices': self.available_voices,
-            'default_voice': self.available_voices[0] if self.available_voices else None
+            'default_voice': self.available_voices[0] if self.available_voices else None,
+            'engine': 'Google Text-to-Speech',
+            'quality': 'high'
         }
     
-    def get_engine_properties(self) -> Dict:
-        """Get current engine properties"""
-        if not self.is_initialized or not self.engine:
-            return {}
-        
-        try:
-            voice_obj = self.engine.getProperty('voice')
-            # Convert voice object to string to avoid JSON serialization issues
-            voice_str = str(voice_obj) if voice_obj else 'default'
-            
-            return {
-                'rate': self.engine.getProperty('rate'),
-                'volume': self.engine.getProperty('volume'),
-                'voice': voice_str
-            }
-        except Exception as e:
-            print(f"Warning: Could not get engine properties: {e}")
-            return {}
-    
-    def set_voice_properties(self, rate: Optional[int] = None, 
-                           volume: Optional[float] = None, 
-                           voice_id: Optional[str] = None) -> bool:
-        """Set voice properties with better error handling"""
-        if not self.is_initialized or not self.engine:
-            return False
-        
-        try:
-            with self.lock:
-                if rate is not None:
-                    # Typical range: 100-300 words per minute
-                    rate = max(50, min(400, rate))
-                    try:
-                        self.engine.setProperty('rate', rate)
-                    except Exception as e:
-                        print(f"Warning: Could not set rate to {rate}: {e}")
-                
-                if volume is not None:
-                    # Volume range: 0.0 to 1.0
-                    volume = max(0.0, min(1.0, volume))
-                    try:
-                        self.engine.setProperty('volume', volume)
-                    except Exception as e:
-                        print(f"Warning: Could not set volume to {volume}: {e}")
-                
-                # Temporarily disable voice selection to fix eSpeak issues
-                if False:  # voice_id is not None and voice_id != '' and voice_id != 'default':
-                    try:
-                        voices = self.engine.getProperty('voices')
-                        if voices:
-                            voice_set = False
-                            
-                            # Try to find voice by ID first
-                            for voice in voices:
-                                if voice.id == voice_id:
-                                    self.engine.setProperty('voice', voice.id)
-                                    voice_set = True
-                                    print(f"✅ Set voice to: {voice.name}")
-                                    break
-                            
-                            # If not found by ID, try by index
-                            if not voice_set:
-                                try:
-                                    voice_index = int(voice_id)
-                                    if 0 <= voice_index < len(voices):
-                                        self.engine.setProperty('voice', voices[voice_index].id)
-                                        voice_set = True
-                                        print(f"✅ Set voice by index {voice_index}: {voices[voice_index].name}")
-                                except (ValueError, IndexError):
-                                    pass
-                            
-                            # If still not set, try to find a working voice
-                            if not voice_set and voices:
-                                for i, voice in enumerate(voices):
-                                    try:
-                                        self.engine.setProperty('voice', voice.id)
-                                        print(f"✅ Fallback to voice {i}: {voice.name}")
-                                        voice_set = True
-                                        break
-                                    except Exception as voice_error:
-                                        print(f"⚠️  Voice {i} failed: {voice_error}")
-                                        continue
-                            
-                            if not voice_set:
-                                print(f"⚠️  Could not set any voice, using default")
-                        else:
-                            print(f"⚠️  No voices available")
-                    except Exception as e:
-                        print(f"Warning: Could not set voice {voice_id}: {e}")
-            
-            return True
-        except Exception as e:
-            print(f"Error setting voice properties: {e}")
-            return False
-    
-    def _run_with_timeout(self, func, timeout=30):
-        """Run a function with timeout to prevent hanging"""
-        result = [None]
-        exception = [None]
-        
-        def target():
-            try:
-                result[0] = func()
-            except Exception as e:
-                exception[0] = e
-        
-        thread = threading.Thread(target=target)
-        thread.daemon = True
-        thread.start()
-        thread.join(timeout)
-        
-        if thread.is_alive():
-            # Thread is still running, timeout occurred
-            return False, "Operation timed out"
-        
-        if exception[0]:
-            raise exception[0]
-        
-        return True, result[0]
+
 
     def text_to_speech_file(self, text: str, output_path: str, 
                           rate: Optional[int] = None,
                           volume: Optional[float] = None,
                           voice_id: Optional[str] = None) -> Tuple[bool, str]:
-        """Convert text to speech and save as audio file"""
+        """Convert text to speech using Google TTS and save as audio file"""
         if not text or not text.strip():
             return False, "No text provided"
         
-        # If TTS engine is not initialized, try direct eSpeak
         if not self.is_initialized:
-            return self._direct_espeak_conversion(text, output_path, rate, volume, voice_id)
-        
-        def conversion_task():
-            # Create a fresh engine instance for this conversion to avoid hanging
-            temp_engine = None
-            try:
-                print(f"🔊 Creating TTS engine for conversion: {output_path}")
-                
-                # Try to initialize engine with same strategy as main engine
-                if platform.system() == 'Linux':
-                    try:
-                        temp_engine = pyttsx3.init(driverName='espeak')
-                        print("✅ Using eSpeak driver for conversion")
-                    except Exception as espeak_error:
-                        print(f"⚠️  eSpeak driver failed: {espeak_error}")
-                        try:
-                            temp_engine = pyttsx3.init()
-                            print("✅ Using default driver for conversion")
-                        except Exception as default_error:
-                            print(f"❌ All drivers failed: {default_error}")
-                            raise default_error
-                else:
-                    temp_engine = pyttsx3.init()
-                
-                # Set properties
-                if rate is not None:
-                    temp_engine.setProperty('rate', max(50, min(400, rate)))
-                else:
-                    temp_engine.setProperty('rate', 200)  # Default rate
-                
-                if volume is not None:
-                    temp_engine.setProperty('volume', max(0.0, min(1.0, volume)))
-                else:
-                    temp_engine.setProperty('volume', 0.9)  # Default volume
-                
-                # Temporarily disable voice selection to fix eSpeak issues
-                if False:  # voice_id is not None and voice_id != '' and voice_id != 'default':
-                    try:
-                        voices = temp_engine.getProperty('voices')
-                        if voices:
-                            voice_set = False
-                            
-                            # Try to find voice by ID first
-                            for voice in voices:
-                                if voice.id == voice_id:
-                                    temp_engine.setProperty('voice', voice.id)
-                                    voice_set = True
-                                    break
-                            
-                            # If not found by ID, try by index
-                            if not voice_set:
-                                try:
-                                    voice_index = int(voice_id)
-                                    if 0 <= voice_index < len(voices):
-                                        temp_engine.setProperty('voice', voices[voice_index].id)
-                                        voice_set = True
-                                except (ValueError, IndexError):
-                                    pass
-                            
-                            # If still not set, use first available voice
-                            if not voice_set and voices:
-                                temp_engine.setProperty('voice', voices[0].id)
-                    except Exception as voice_error:
-                        print(f"Warning: Could not set voice {voice_id}: {voice_error}")
-                        # Continue with default voice
-                
-                # Ensure output directory exists
-                output_dir = os.path.dirname(output_path)
-                if output_dir:
-                    os.makedirs(output_dir, exist_ok=True)
-                
-                # Convert text to speech
-                print(f"🎵 Saving TTS to file...")
-                try:
-                    temp_engine.save_to_file(text, output_path)
-                    temp_engine.runAndWait()
-                    print(f"✅ TTS conversion completed")
-                except Exception as save_error:
-                    print(f"⚠️  pyttsx3 save failed: {save_error}")
-                    # Fallback to direct eSpeak command
-                    print(f"🔄 Trying direct eSpeak command...")
-                    import subprocess
-                    try:
-                        subprocess.run([
-                            'espeak',
-                            '-w', output_path,  # Write to WAV file
-                            '-s', str(rate or 200),  # Speed
-                            '-a', str(int((volume or 0.9) * 200)),  # Amplitude (0-200)
-                            text
-                        ], check=True, timeout=30)
-                        print(f"✅ Direct eSpeak conversion completed")
-                    except subprocess.CalledProcessError as cmd_error:
-                        print(f"❌ Direct eSpeak failed: {cmd_error}")
-                        raise cmd_error
-                    except FileNotFoundError:
-                        print(f"❌ eSpeak command not found")
-                        raise Exception("eSpeak not available")
-                    except subprocess.TimeoutExpired:
-                        print(f"❌ eSpeak command timed out")
-                        raise Exception("eSpeak timed out")
-                
-                return "Success"
-                
-            except Exception as e:
-                print(f"❌ TTS engine error: {e}")
-                raise e
-            finally:
-                # Clean up the temporary engine
-                if temp_engine:
-                    try:
-                        temp_engine.stop()
-                        del temp_engine
-                    except:
-                        pass
+            return False, "Google TTS service not initialized"
         
         try:
-            # Run conversion with timeout
-            success, result = self._run_with_timeout(conversion_task, timeout=20)
+            from gtts import gTTS
+            import pygame
+            from pydub import AudioSegment
+            from pydub.effects import speedup
             
-            if not success:
-                return False, result  # result contains error message
+            # Parse voice_id to get language and TLD
+            language = 'en'
+            tld = 'com'
+            
+            if voice_id and voice_id != 'default':
+                # Find the voice in available voices
+                selected_voice = None
+                for voice in self.available_voices:
+                    if voice['id'] == voice_id or str(voice['index']) == str(voice_id):
+                        selected_voice = voice
+                        break
+                
+                if selected_voice:
+                    language = selected_voice['language']
+                    tld = selected_voice['tld']
+                    print(f"🎤 Using voice: {selected_voice['name']} ({language}-{tld})")
+                else:
+                    print(f"⚠️  Voice {voice_id} not found, using default")
+            
+            # Ensure output directory exists
+            output_dir = os.path.dirname(output_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            
+            print(f"🔊 Converting text to speech with Google TTS...")
+            print(f"📝 Text length: {len(text)} characters")
+            print(f"🌍 Language: {language}, TLD: {tld}")
+            
+            # Create gTTS object
+            tts = gTTS(text=text, lang=language, tld=tld, slow=False)
+            
+            # Save to a temporary MP3 file first
+            temp_mp3 = output_path.replace('.wav', '_temp.mp3')
+            tts.save(temp_mp3)
+            print(f"✅ Google TTS generated MP3 file")
+            
+            # Convert MP3 to WAV and apply rate/volume adjustments
+            try:
+                # Load the MP3 file
+                audio = AudioSegment.from_mp3(temp_mp3)
+                
+                # Apply rate adjustment (speed change)
+                if rate and rate != 200:
+                    # Calculate speed multiplier (200 WPM is baseline)
+                    speed_multiplier = rate / 200.0
+                    speed_multiplier = max(0.5, min(2.0, speed_multiplier))  # Limit to reasonable range
+                    
+                    if speed_multiplier != 1.0:
+                        audio = speedup(audio, playback_speed=speed_multiplier)
+                        print(f"🎛️  Applied speed adjustment: {speed_multiplier}x")
+                
+                # Apply volume adjustment
+                if volume and volume != 0.9:
+                    # Convert volume (0.0-1.0) to dB change
+                    volume_db = 20 * (volume - 0.9)  # 0.9 is baseline
+                    volume_db = max(-20, min(20, volume_db))  # Limit to reasonable range
+                    
+                    if abs(volume_db) > 0.1:
+                        audio = audio + volume_db
+                        print(f"🔊 Applied volume adjustment: {volume_db:.1f}dB")
+                
+                # Export as WAV
+                audio.export(output_path, format="wav")
+                print(f"✅ Converted to WAV format")
+                
+                # Clean up temporary MP3 file
+                if os.path.exists(temp_mp3):
+                    os.remove(temp_mp3)
+                
+            except ImportError as import_error:
+                print(f"⚠️  Audio processing libraries not available: {import_error}")
+                print("🔄 Using basic MP3 to WAV conversion...")
+                
+                # Fallback: simple conversion without rate/volume adjustment
+                try:
+                    import subprocess
+                    # Try using ffmpeg if available
+                    subprocess.run([
+                        'ffmpeg', '-i', temp_mp3, '-acodec', 'pcm_s16le', 
+                        '-ar', '22050', '-ac', '1', output_path, '-y'
+                    ], check=True, capture_output=True)
+                    print(f"✅ Converted using ffmpeg")
+                    
+                    # Clean up temporary MP3 file
+                    if os.path.exists(temp_mp3):
+                        os.remove(temp_mp3)
+                        
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    # If ffmpeg not available, just rename MP3 to WAV (not ideal but works)
+                    print("⚠️  ffmpeg not available, keeping as MP3 format")
+                    if os.path.exists(temp_mp3):
+                        os.rename(temp_mp3, output_path.replace('.wav', '.mp3'))
+                        output_path = output_path.replace('.wav', '.mp3')
             
             # Verify file was created
             if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
                 file_size = os.path.getsize(output_path)
-                print(f"📄 Generated audio file: {file_size} bytes")
+                print(f"📄 Generated high-quality audio file: {file_size} bytes")
                 return True, "Success"
             else:
                 return False, "Audio file was not created or is empty"
                 
+        except ImportError as e:
+            error_msg = f"Google TTS library not available: {str(e)}"
+            print(f"❌ {error_msg}")
+            return False, error_msg
         except Exception as e:
-            error_msg = f"TTS conversion failed: {str(e)}"
+            error_msg = f"Google TTS conversion failed: {str(e)}"
             print(f"❌ {error_msg}")
             return False, error_msg
     
@@ -467,196 +305,89 @@ class TTSService:
                       rate: Optional[int] = None,
                       volume: Optional[float] = None,
                       voice_id: Optional[str] = None) -> Tuple[bool, str]:
-        """Preview text-to-speech (play directly without saving)"""
+        """Preview text-to-speech using Google TTS (server-side note)"""
         if not text or not text.strip():
             return False, "No text provided"
         
-        def preview_task():
-            # Create a fresh engine instance for this preview
-            temp_engine = None
-            try:
-                print(f"🔊 Creating TTS engine for preview")
-                temp_engine = pyttsx3.init()
-                
-                # Set properties
-                if rate is not None:
-                    temp_engine.setProperty('rate', max(50, min(400, rate)))
-                else:
-                    temp_engine.setProperty('rate', 200)
-                
-                if volume is not None:
-                    temp_engine.setProperty('volume', max(0.0, min(1.0, volume)))
-                else:
-                    temp_engine.setProperty('volume', 0.9)
-                
-                # Temporarily disable voice selection to fix eSpeak issues
-                if False:  # voice_id is not None and voice_id != '' and voice_id != 'default':
-                    try:
-                        voices = temp_engine.getProperty('voices')
-                        if voices:
-                            voice_set = False
-                            
-                            # Try to find voice by ID first
-                            for voice in voices:
-                                if voice.id == voice_id:
-                                    temp_engine.setProperty('voice', voice.id)
-                                    voice_set = True
-                                    break
-                            
-                            # If not found by ID, try by index
-                            if not voice_set:
-                                try:
-                                    voice_index = int(voice_id)
-                                    if 0 <= voice_index < len(voices):
-                                        temp_engine.setProperty('voice', voices[voice_index].id)
-                                        voice_set = True
-                                except (ValueError, IndexError):
-                                    pass
-                            
-                            # If still not set, use first available voice
-                            if not voice_set and voices:
-                                temp_engine.setProperty('voice', voices[0].id)
-                    except Exception as voice_error:
-                        print(f"Warning: Could not set voice {voice_id}: {voice_error}")
-                        # Continue with default voice
-                
-                # Speak the text
-                print(f"🎵 Playing speech preview...")
-                temp_engine.say(text)
-                temp_engine.runAndWait()
-                print(f"✅ Speech preview completed")
-                
-                return "Speech preview completed"
-                
-            except Exception as e:
-                print(f"❌ TTS preview error: {e}")
-                raise e
-            finally:
-                # Clean up the temporary engine
-                if temp_engine:
-                    try:
-                        temp_engine.stop()
-                        del temp_engine
-                    except:
-                        pass
+        if not self.is_initialized:
+            return False, "Google TTS service not initialized"
         
+        # For server environments, we can't actually play audio
+        # So we'll just validate the text and return success
         try:
-            # Run preview with timeout
-            success, result = self._run_with_timeout(preview_task, timeout=15)
+            # Limit preview text length
+            if len(text) > 500:
+                return False, "Preview text too long (max 500 characters)"
             
-            if not success:
-                return False, result  # result contains error message
-            
-            return True, result
+            # Parse voice_id to validate it exists
+            if voice_id and voice_id != 'default':
+                voice_found = False
+                for voice in self.available_voices:
+                    if voice['id'] == voice_id or str(voice['index']) == str(voice_id):
+                        voice_found = True
+                        print(f"🎤 Preview would use voice: {voice['name']}")
+                        break
                 
+                if not voice_found:
+                    print(f"⚠️  Voice {voice_id} not found, would use default")
+            
+            print(f"🎵 Preview validated for {len(text)} characters")
+            print(f"ℹ️  Note: Server-side preview - audio would be generated with these settings")
+            
+            return True, "Preview validated successfully (server environment - no audio playback)"
+            
         except Exception as e:
-            error_msg = f"Speech preview failed: {str(e)}"
+            error_msg = f"Preview validation failed: {str(e)}"
             print(f"❌ {error_msg}")
             return False, error_msg
     
-    def _direct_espeak_conversion(self, text: str, output_path: str, 
-                                rate: Optional[int] = None,
-                                volume: Optional[float] = None,
-                                voice_id: Optional[str] = None) -> Tuple[bool, str]:
-        """Direct eSpeak conversion as fallback when pyttsx3 fails"""
-        try:
-            import subprocess
-            
-            # Ensure output directory exists
-            output_dir = os.path.dirname(output_path)
-            if output_dir:
-                os.makedirs(output_dir, exist_ok=True)
-            
-            # Build eSpeak command
-            cmd = ['espeak']
-            
-            # Output to WAV file
-            cmd.extend(['-w', output_path])
-            
-            # Set speed (words per minute)
-            if rate:
-                cmd.extend(['-s', str(max(50, min(400, rate)))])
-            else:
-                cmd.extend(['-s', '200'])  # Default speed
-            
-            # Set amplitude (volume) - eSpeak uses 0-200 scale
-            if volume:
-                amplitude = int(max(0, min(1, volume)) * 200)
-                cmd.extend(['-a', str(amplitude)])
-            else:
-                cmd.extend(['-a', '180'])  # Default amplitude
-            
-            # Add text
-            cmd.append(text)
-            
-            print(f"🔊 Running direct eSpeak: {' '.join(cmd[:6])}... [text]")
-            
-            # Run eSpeak command
-            result = subprocess.run(cmd, 
-                                  capture_output=True, 
-                                  text=True, 
-                                  timeout=30)
-            
-            if result.returncode == 0:
-                # Verify file was created
-                if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-                    file_size = os.path.getsize(output_path)
-                    print(f"✅ Direct eSpeak conversion successful: {file_size} bytes")
-                    return True, "Success"
-                else:
-                    return False, "Audio file was not created or is empty"
-            else:
-                error_msg = f"eSpeak command failed: {result.stderr}"
-                print(f"❌ {error_msg}")
-                return False, error_msg
-                
-        except subprocess.TimeoutExpired:
-            return False, "eSpeak conversion timed out"
-        except FileNotFoundError:
-            return False, "eSpeak command not found - please install espeak"
-        except Exception as e:
-            error_msg = f"Direct eSpeak conversion failed: {str(e)}"
-            print(f"❌ {error_msg}")
-            return False, error_msg
-
     def get_supported_formats(self) -> List[str]:
         """Get supported output audio formats"""
-        # pyttsx3 typically supports WAV format
-        # Some engines may support additional formats
-        return ['wav']
+        return ['wav', 'mp3']  # Google TTS supports both
     
     def health_check(self) -> Dict:
-        """Check TTS service health"""
+        """Check Google TTS service health"""
         if not self.is_initialized:
-            # Check if direct eSpeak is available as fallback
+            # Check if gTTS can be imported
             try:
-                import subprocess
-                result = subprocess.run(['espeak', '--version'], 
-                                      capture_output=True, timeout=5)
-                espeak_available = result.returncode == 0
-                espeak_version = result.stdout.decode().strip() if espeak_available else None
-            except:
-                espeak_available = False
-                espeak_version = None
+                from gtts import gTTS
+                gtts_available = True
+                gtts_error = None
+            except ImportError as e:
+                gtts_available = False
+                gtts_error = str(e)
             
             return {
                 'initialized': False,
-                'pyttsx3_available': False,
-                'espeak_available': espeak_available,
-                'espeak_version': espeak_version,
-                'voices_available': 3 if espeak_available else 0,  # Fallback voices
+                'gtts_available': gtts_available,
+                'gtts_error': gtts_error,
+                'voices_available': 0,
                 'supported_formats': self.get_supported_formats(),
-                'mode': 'direct_espeak' if espeak_available else 'unavailable'
+                'mode': 'unavailable'
             }
+        
+        # Test internet connectivity for Google TTS
+        internet_available = self._test_internet_connection()
         
         return {
             'initialized': self.is_initialized,
-            'pyttsx3_available': True,
+            'gtts_available': True,
+            'internet_available': internet_available,
             'voices_available': len(self.available_voices),
             'supported_formats': self.get_supported_formats(),
-            'engine_properties': self.get_engine_properties(),
-            'mode': 'pyttsx3'
+            'languages_supported': len(self.supported_languages),
+            'mode': 'google_tts',
+            'quality': 'high'
         }
+    
+    def _test_internet_connection(self) -> bool:
+        """Test if internet connection is available for Google TTS"""
+        try:
+            import urllib.request
+            urllib.request.urlopen('https://translate.google.com', timeout=5)
+            return True
+        except:
+            return False
 
 # Global TTS service instance
 tts_service = TTSService()
