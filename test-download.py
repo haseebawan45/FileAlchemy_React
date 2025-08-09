@@ -1,125 +1,118 @@
 #!/usr/bin/env python3
 """
-Test download functionality on Railway
+Test script to verify TTS API endpoints
 """
 
 import requests
-import tempfile
-import os
+import json
 import time
 
-def test_download_functionality():
-    """Test the complete upload -> convert -> download flow"""
-    base_url = 'https://filealchemy-production.up.railway.app'
-    api_url = f'{base_url}/api'
+# Test configuration
+BASE_URL = "http://localhost:5000"  # Local development server
+TEST_TEXT = "Hello! This is a test of the FileAlchemy text-to-speech system. It should work perfectly!"
+
+def test_tts_api():
+    print("🧪 Testing TTS API Endpoints...")
     
-    print("🧪 Testing Download Functionality")
-    print("=" * 40)
-    
-    # Create a test file
-    test_content = "This is a test file for conversion.\nLine 2 of the test file.\nEnd of test."
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
-        temp_file.write(test_content)
-        temp_file_path = temp_file.name
-    
+    # Test 1: Health check
+    print("\n1. Testing TTS Health Check:")
     try:
-        print("📄 Created test file: test.txt")
+        response = requests.get(f"{BASE_URL}/api/tts/health", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   ✅ Health check successful")
+            print(f"   📊 Health data: {json.dumps(data, indent=2)}")
+        else:
+            print(f"   ❌ Health check failed: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"   ❌ Health check error: {e}")
+        return False
+    
+    # Test 2: Get voices
+    print("\n2. Testing Get Voices:")
+    try:
+        response = requests.get(f"{BASE_URL}/api/tts/voices", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   ✅ Get voices successful")
+            if data.get('success') and data.get('voices'):
+                print(f"   🎤 Available voices: {len(data['voices'])}")
+                for i, voice in enumerate(data['voices'][:2]):  # Show first 2
+                    print(f"      Voice {i}: {voice.get('name', 'Unknown')}")
+            else:
+                print(f"   ⚠️  No voices available: {data}")
+        else:
+            print(f"   ❌ Get voices failed: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"   ❌ Get voices error: {e}")
+        return False
+    
+    # Test 3: Convert text to speech
+    print("\n3. Testing Text to Speech Conversion:")
+    try:
+        payload = {
+            "text": TEST_TEXT,
+            "rate": 200,
+            "volume": 0.8
+        }
         
-        # Test single file conversion (synchronous)
-        print("\n🔄 Testing synchronous conversion (TXT → PDF)...")
-        
-        with open(temp_file_path, 'rb') as f:
-            files = {'file': ('test.txt', f, 'text/plain')}
-            data = {
-                'source_format': 'TXT',
-                'target_format': 'PDF'
-            }
-            
-            response = requests.post(f'{api_url}/convert', files=files, data=data, timeout=30)
-            
-        print(f"Response status: {response.status_code}")
+        response = requests.post(
+            f"{BASE_URL}/api/tts/convert", 
+            json=payload,
+            timeout=30
+        )
         
         if response.status_code == 200:
-            result = response.json()
-            print("✅ Conversion successful!")
-            print(f"   Original: {result.get('original_filename')}")
-            print(f"   Converted: {result.get('converted_filename')}")
-            print(f"   Size: {result.get('size')} bytes")
-            print(f"   Download URL: {result.get('download_url')}")
+            data = response.json()
+            print(f"   ✅ TTS conversion successful")
+            print(f"   📄 Filename: {data.get('filename')}")
+            print(f"   📊 File size: {data.get('size')} bytes")
+            print(f"   🔗 Download URL: {data.get('download_url')}")
             
             # Test download
-            download_url = f"{base_url}{result.get('download_url')}"
-            print(f"\n📥 Testing download from: {download_url}")
+            if data.get('download_url'):
+                print("\n4. Testing Audio File Download:")
+                download_url = f"{BASE_URL}{data['download_url']}"
+                download_response = requests.get(download_url, timeout=10)
+                
+                if download_response.status_code == 200:
+                    print(f"   ✅ Download successful")
+                    print(f"   📊 Downloaded size: {len(download_response.content)} bytes")
+                    
+                    # Save test file
+                    with open("test_downloaded_audio.wav", "wb") as f:
+                        f.write(download_response.content)
+                    print(f"   💾 Saved as: test_downloaded_audio.wav")
+                else:
+                    print(f"   ❌ Download failed: {download_response.status_code}")
+                    return False
             
-            download_response = requests.get(download_url, timeout=30)
-            print(f"Download status: {download_response.status_code}")
-            
-            if download_response.status_code == 200:
-                print("✅ Download successful!")
-                print(f"   Content-Type: {download_response.headers.get('Content-Type')}")
-                print(f"   Content-Length: {download_response.headers.get('Content-Length')}")
-                print(f"   Downloaded size: {len(download_response.content)} bytes")
-                
-                # Save downloaded file for verification
-                with open('downloaded_test.pdf', 'wb') as f:
-                    f.write(download_response.content)
-                print("   Saved as: downloaded_test.pdf")
-                
-            else:
-                print("❌ Download failed!")
-                print(f"   Error: {download_response.text}")
-                
         else:
-            print("❌ Conversion failed!")
-            print(f"   Error: {response.text}")
+            print(f"   ❌ TTS conversion failed: {response.status_code}")
+            print(f"   📄 Response: {response.text}")
+            return False
             
     except Exception as e:
-        print(f"❌ Test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        
-    finally:
-        # Cleanup
-        try:
-            os.unlink(temp_file_path)
-        except:
-            pass
-
-def test_health_and_formats():
-    """Test basic API endpoints"""
-    base_url = 'https://filealchemy-production.up.railway.app'
-    api_url = f'{base_url}/api'
+        print(f"   ❌ TTS conversion error: {e}")
+        return False
     
-    print("\n🏥 Testing API Health...")
-    try:
-        response = requests.get(f'{api_url}/health', timeout=10)
-        if response.status_code == 200:
-            health = response.json()
-            print("✅ API is healthy")
-            print(f"   Environment: {health.get('environment')}")
-            print(f"   Port: {health.get('port')}")
-        else:
-            print("❌ API health check failed")
-    except Exception as e:
-        print(f"❌ Health check error: {e}")
-    
-    print("\n📋 Testing Formats Endpoint...")
-    try:
-        response = requests.get(f'{api_url}/formats', timeout=10)
-        if response.status_code == 200:
-            formats = response.json()
-            print("✅ Formats endpoint working")
-            print(f"   Available formats: {len(formats.get('formats', {}))}")
-        else:
-            print("❌ Formats endpoint failed")
-    except Exception as e:
-        print(f"❌ Formats check error: {e}")
+    print("\n✅ All TTS API tests passed!")
+    return True
 
 if __name__ == "__main__":
-    test_health_and_formats()
-    test_download_functionality()
+    print("🚀 Starting TTS API tests...")
+    print("⚠️  Make sure the Flask server is running on localhost:5000")
+    print("   Run: python backend/api_server.py")
     
-    print("\n" + "=" * 40)
-    print("🎯 Test completed!")
-    print("🌐 Live app: https://filealchemy-production.up.railway.app")
+    # Wait a moment for user to start server if needed
+    input("\nPress Enter when the server is ready...")
+    
+    success = test_tts_api()
+    
+    if success:
+        print("\n🎉 All tests completed successfully!")
+        print("🔊 You can now use the TTS feature in your web application!")
+    else:
+        print("\n❌ Some tests failed. Check the server logs for details.")

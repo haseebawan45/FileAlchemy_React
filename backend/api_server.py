@@ -13,6 +13,7 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from file_converter import FileConversionService
+from tts_service import tts_service
 import threading
 import time
 
@@ -212,6 +213,9 @@ def health_check():
         formats = {}
         service_status = f'degraded: {str(e)}'
     
+    # Check TTS service
+    tts_health = tts_service.health_check()
+    
     return jsonify({
         'status': service_status,
         'service': 'FileAlchemy API',
@@ -219,7 +223,8 @@ def health_check():
         'environment': os.environ.get('FLASK_ENV', 'development'),
         'port': os.environ.get('PORT', '5000'),
         'supported_formats': len(formats),
-        'frontend_available': os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dist'))
+        'frontend_available': os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dist')),
+        'tts_service': tts_health
     })
 
 @app.route('/api/formats', methods=['GET'])
@@ -468,6 +473,154 @@ def convert_single_file():
                 os.remove(input_path)
             except OSError:
                 pass
+
+# TTS API Endpoints
+@app.route('/api/tts/voices', methods=['GET'])
+def get_tts_voices():
+    """Get available TTS voices"""
+    try:
+        voices_data = tts_service.get_voices()
+        return jsonify(voices_data)
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get voices: {str(e)}',
+            'voices': []
+        }), 500
+
+@app.route('/api/tts/convert', methods=['POST'])
+def text_to_speech():
+    """Convert text to speech audio file"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+        
+        text = data.get('text', '').strip()
+        if not text:
+            return jsonify({'success': False, 'error': 'No text provided'}), 400
+        
+        # Optional parameters
+        rate = data.get('rate')  # Words per minute (100-300)
+        volume = data.get('volume')  # 0.0 to 1.0
+        voice_id = data.get('voice_id')  # Voice ID or index
+        
+        # Validate parameters
+        if rate is not None:
+            try:
+                rate = int(rate)
+                if rate < 50 or rate > 400:
+                    return jsonify({'success': False, 'error': 'Rate must be between 50 and 400 WPM'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'error': 'Invalid rate value'}), 400
+        
+        if volume is not None:
+            try:
+                volume = float(volume)
+                if volume < 0.0 or volume > 1.0:
+                    return jsonify({'success': False, 'error': 'Volume must be between 0.0 and 1.0'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'error': 'Invalid volume value'}), 400
+        
+        # Generate unique filename
+        filename = f"tts_{uuid.uuid4()}.wav"
+        output_path = os.path.join(CONVERTED_FOLDER, filename)
+        
+        # Convert text to speech
+        success, message = tts_service.text_to_speech_file(
+            text, output_path, rate, volume, voice_id
+        )
+        
+        if success:
+            file_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+            return jsonify({
+                'success': True,
+                'message': message,
+                'filename': filename,
+                'download_url': f"/api/download/{filename}",
+                'size': file_size,
+                'text_length': len(text)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': message
+            }), 500
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/tts/preview', methods=['POST'])
+def preview_speech():
+    """Preview text-to-speech (play directly without saving)"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No JSON data provided'}), 400
+        
+        text = data.get('text', '').strip()
+        if not text:
+            return jsonify({'success': False, 'error': 'No text provided'}), 400
+        
+        # Limit preview text length for performance
+        if len(text) > 500:
+            return jsonify({'success': False, 'error': 'Preview text too long (max 500 characters)'}), 400
+        
+        # Optional parameters
+        rate = data.get('rate')
+        volume = data.get('volume')
+        voice_id = data.get('voice_id')
+        
+        # Validate parameters (same as convert endpoint)
+        if rate is not None:
+            try:
+                rate = int(rate)
+                if rate < 50 or rate > 400:
+                    return jsonify({'success': False, 'error': 'Rate must be between 50 and 400 WPM'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'error': 'Invalid rate value'}), 400
+        
+        if volume is not None:
+            try:
+                volume = float(volume)
+                if volume < 0.0 or volume > 1.0:
+                    return jsonify({'success': False, 'error': 'Volume must be between 0.0 and 1.0'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'error': 'Invalid volume value'}), 400
+        
+        # Preview speech
+        success, message = tts_service.preview_speech(text, rate, volume, voice_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': message,
+                'text_length': len(text)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': message
+            }), 500
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/tts/health', methods=['GET'])
+def tts_health_check():
+    """TTS service health check"""
+    try:
+        health_data = tts_service.health_check()
+        return jsonify({
+            'success': True,
+            'health': health_data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'health': {'initialized': False}
+        }), 500
 
 # Cleanup task
 def cleanup_task():

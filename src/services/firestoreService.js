@@ -342,6 +342,96 @@ class FirestoreService {
     }
   }
 
+  // ==================== TTS-SPECIFIC METHODS ====================
+  
+  /**
+   * Save TTS preferences specifically
+   * @param {string} userId - User ID
+   * @param {Object} ttsPreferences - TTS preferences object
+   */
+  async saveTTSPreferences(userId, ttsPreferences) {
+    try {
+      const preferences = {
+        tts: {
+          ...ttsPreferences,
+          lastUpdated: new Date().toISOString()
+        }
+      };
+      
+      return await this.saveUserPreferences(userId, preferences);
+    } catch (error) {
+      console.error('Error saving TTS preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get TTS preferences specifically
+   * @param {string} userId - User ID
+   */
+  async getTTSPreferences(userId) {
+    try {
+      const result = await this.getUserPreferences(userId);
+      if (result.success && result.data.tts) {
+        return { success: true, data: result.data.tts };
+      } else {
+        // Return default TTS preferences
+        const defaultTTSPrefs = {
+          selectedVoice: '',
+          rate: 200,
+          volume: 0.9,
+          autoSave: true,
+          preferredFormat: 'wav'
+        };
+        return { success: true, data: defaultTTSPrefs };
+      }
+    } catch (error) {
+      console.error('Error fetching TTS preferences:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Get TTS conversion history for a user
+   * @param {string} userId - User ID
+   * @param {number} limitCount - Number of records to fetch
+   */
+  async getTTSConversionHistory(userId, limitCount = 10) {
+    try {
+      const q = query(
+        collection(db, this.collections.conversions),
+        where('userId', '==', userId),
+        where('category', '==', 'tts'),
+        orderBy('createdAt', 'desc'),
+        limit(limitCount)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const history = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        history.push({
+          id: doc.id,
+          text: data.originalText?.substring(0, 100) + (data.originalText?.length > 100 ? '...' : '') || 'TTS Conversion',
+          wordCount: data.wordCount || 0,
+          voice: data.voiceName || 'Default',
+          rate: data.speechRate || 200,
+          volume: data.speechVolume || 0.9,
+          timestamp: data.createdAt?.toDate?.()?.toLocaleString() || new Date().toLocaleString(),
+          filename: data.outputFileName || 'audio.wav',
+          size: data.outputFileSize || 0,
+          createdAt: data.createdAt
+        });
+      });
+      
+      return { success: true, data: history };
+    } catch (error) {
+      console.error('Error fetching TTS conversion history:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // ==================== USER PREFERENCES ====================
   
   /**

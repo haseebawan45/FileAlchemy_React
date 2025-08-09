@@ -15,6 +15,7 @@ import ContactPage from './components/ContactPage';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import TermsOfServicePage from './components/TermsOfServicePage';
 import AllFormatsPage from './components/AllFormatsPage';
+import TTSPage from './components/TTSPage';
 import Notifications from './components/ui/Notifications';
 
 
@@ -114,6 +115,10 @@ function AppContent() {
             e.preventDefault();
             handleNavigation('help');
             break;
+          case 't':
+            e.preventDefault();
+            handleNavigation('tts');
+            break;
           case 'd':
             e.preventDefault();
             handleNavigation('analytics');
@@ -156,6 +161,8 @@ function AppContent() {
         return <TermsOfServicePage />;
       case 'formats':
         return <AllFormatsPage onCategorySelect={handleCategorySelect} onBack={() => handleNavigation('home')} />;
+      case 'tts':
+        return <TTSPage onBack={() => handleNavigation('home')} onNavigate={handleNavigation} />;
       default:
         return <HomePage onCategorySelect={handleCategorySelect} />;
     }

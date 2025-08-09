@@ -40,6 +40,7 @@ const Header = ({ currentView, onNavigate, user }) => {
 
   const navigationItems = [
     { id: 'home', label: 'Home', shortcut: 'Ctrl+H' },
+    { id: 'tts', label: 'Text to Speech', shortcut: 'Ctrl+T' },
     { id: 'analytics', label: 'Analytics', shortcut: 'Ctrl+D' },
     { id: 'about', label: 'About', shortcut: 'Ctrl+A' },
     { id: 'help', label: 'Help', shortcut: 'Ctrl+K' },

@@ -30,6 +30,13 @@ export const endpoints = {
   convert: '/convert',
   status: (jobId) => `/status/${jobId}`,
   download: (filename) => `/download/${filename}`,
+  // TTS endpoints
+  tts: {
+    voices: '/tts/voices',
+    convert: '/tts/convert',
+    preview: '/tts/preview',
+    health: '/tts/health',
+  },
 };
 
 export default apiConfig;
