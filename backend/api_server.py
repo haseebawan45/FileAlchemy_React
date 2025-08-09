@@ -41,9 +41,11 @@ else:
     else:
         CORS(app)  # Fallback to allow all if not configured
 
-# Configuration
-UPLOAD_FOLDER = 'temp_uploads'
-CONVERTED_FOLDER = 'temp_converted'
+# Configuration - Use absolute paths for Railway deployment
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'temp_uploads')
+CONVERTED_FOLDER = os.path.join(BASE_DIR, 'temp_converted')
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 ALLOWED_EXTENSIONS = {
     'images': {'jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif', 'heic', 'heif', 'webp', 'ico', 'svg'},
@@ -334,12 +336,48 @@ def get_conversion_status(job_id):
 @app.route('/api/download/<filename>', methods=['GET'])
 def download_file(filename):
     """Download converted file"""
-    filepath = os.path.join(CONVERTED_FOLDER, filename)
-    
-    if not os.path.exists(filepath):
-        return jsonify({'success': False, 'error': 'File not found'}), 404
-    
-    return send_file(filepath, as_attachment=True)
+    try:
+        # Security check - prevent directory traversal
+        if '..' in filename or '/' in filename or '\\' in filename:
+            print(f"❌ Security violation: Invalid filename {filename}")
+            return jsonify({'success': False, 'error': 'Invalid filename'}), 400
+        
+        filepath = os.path.join(CONVERTED_FOLDER, filename)
+        print(f"🔍 Download request for: {filename}")
+        print(f"📁 Full path: {filepath}")
+        print(f"📂 Converted folder: {CONVERTED_FOLDER}")
+        print(f"📋 Folder exists: {os.path.exists(CONVERTED_FOLDER)}")
+        print(f"📄 File exists: {os.path.exists(filepath)}")
+        
+        # List files in converted folder for debugging
+        if os.path.exists(CONVERTED_FOLDER):
+            files_in_folder = os.listdir(CONVERTED_FOLDER)
+            print(f"📁 Files in converted folder: {files_in_folder}")
+        else:
+            print("❌ Converted folder does not exist!")
+            os.makedirs(CONVERTED_FOLDER, exist_ok=True)
+            print("✅ Created converted folder")
+        
+        if not os.path.exists(filepath):
+            print(f"❌ File not found: {filepath}")
+            return jsonify({'success': False, 'error': f'File not found: {filename}'}), 404
+        
+        # Check file size
+        file_size = os.path.getsize(filepath)
+        print(f"📊 File size: {file_size} bytes")
+        
+        if file_size == 0:
+            print(f"⚠️ Warning: File is empty: {filepath}")
+            return jsonify({'success': False, 'error': 'File is empty'}), 404
+        
+        print(f"✅ Sending file: {filepath}")
+        return send_file(filepath, as_attachment=True, download_name=filename)
+        
+    except Exception as e:
+        print(f"❌ Download error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Download failed: {str(e)}'}), 500
 
 @app.route('/api/convert', methods=['POST'])
 def convert_single_file():
@@ -473,6 +511,12 @@ cleanup_thread.start()
 
 if __name__ == '__main__':
     print("Starting FileAlchemy API Server...")
+    print(f"Base directory: {BASE_DIR}")
+    print(f"Upload folder: {UPLOAD_FOLDER}")
+    print(f"Converted folder: {CONVERTED_FOLDER}")
+    print(f"Upload folder exists: {os.path.exists(UPLOAD_FOLDER)}")
+    print(f"Converted folder exists: {os.path.exists(CONVERTED_FOLDER)}")
+    
     print("Supported formats:")
     formats = conversion_service.list_supported_formats()
     for conv_type, format_dict in formats.items():

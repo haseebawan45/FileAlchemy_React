@@ -71,7 +71,8 @@ def main():
     
     print("\n🎉 Deployment completed!")
     print("🌐 Your app is live at: https://filealchemy-production.up.railway.app")
-    print("🔧 Frontend now configured for production mode - always uses Railway backend")
+    print("🔧 Fixed download issue with absolute file paths")
+    print("🔧 Frontend configured for production mode - always uses Railway backend")
     print("⏳ It may take a few minutes for changes to propagate")
     
     # Run comprehensive test
