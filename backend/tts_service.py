@@ -158,10 +158,39 @@ class TTSService:
     def get_voices(self) -> Dict:
         """Get available voices for API response"""
         if not self.is_initialized:
+            # Provide fallback voices for direct eSpeak usage
+            fallback_voices = [
+                {
+                    'id': 'en',
+                    'name': 'English Default',
+                    'gender': 'unknown',
+                    'age': 'unknown',
+                    'languages': ['en'],
+                    'index': 0
+                },
+                {
+                    'id': 'en+f3',
+                    'name': 'English Female',
+                    'gender': 'female',
+                    'age': 'unknown',
+                    'languages': ['en'],
+                    'index': 1
+                },
+                {
+                    'id': 'en+m3',
+                    'name': 'English Male',
+                    'gender': 'male',
+                    'age': 'unknown',
+                    'languages': ['en'],
+                    'index': 2
+                }
+            ]
+            
             return {
-                'success': False,
-                'error': 'TTS engine not initialized',
-                'voices': []
+                'success': True,
+                'voices': fallback_voices,
+                'default_voice': fallback_voices[0],
+                'note': 'Using direct eSpeak voices (pyttsx3 unavailable)'
             }
         
         return {
@@ -296,6 +325,10 @@ class TTSService:
         """Convert text to speech and save as audio file"""
         if not text or not text.strip():
             return False, "No text provided"
+        
+        # If TTS engine is not initialized, try direct eSpeak
+        if not self.is_initialized:
+            return self._direct_espeak_conversion(text, output_path, rate, volume, voice_id)
         
         def conversion_task():
             # Create a fresh engine instance for this conversion to avoid hanging
@@ -521,6 +554,71 @@ class TTSService:
             print(f"❌ {error_msg}")
             return False, error_msg
     
+    def _direct_espeak_conversion(self, text: str, output_path: str, 
+                                rate: Optional[int] = None,
+                                volume: Optional[float] = None,
+                                voice_id: Optional[str] = None) -> Tuple[bool, str]:
+        """Direct eSpeak conversion as fallback when pyttsx3 fails"""
+        try:
+            import subprocess
+            
+            # Ensure output directory exists
+            output_dir = os.path.dirname(output_path)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+            
+            # Build eSpeak command
+            cmd = ['espeak']
+            
+            # Output to WAV file
+            cmd.extend(['-w', output_path])
+            
+            # Set speed (words per minute)
+            if rate:
+                cmd.extend(['-s', str(max(50, min(400, rate)))])
+            else:
+                cmd.extend(['-s', '200'])  # Default speed
+            
+            # Set amplitude (volume) - eSpeak uses 0-200 scale
+            if volume:
+                amplitude = int(max(0, min(1, volume)) * 200)
+                cmd.extend(['-a', str(amplitude)])
+            else:
+                cmd.extend(['-a', '180'])  # Default amplitude
+            
+            # Add text
+            cmd.append(text)
+            
+            print(f"🔊 Running direct eSpeak: {' '.join(cmd[:6])}... [text]")
+            
+            # Run eSpeak command
+            result = subprocess.run(cmd, 
+                                  capture_output=True, 
+                                  text=True, 
+                                  timeout=30)
+            
+            if result.returncode == 0:
+                # Verify file was created
+                if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                    file_size = os.path.getsize(output_path)
+                    print(f"✅ Direct eSpeak conversion successful: {file_size} bytes")
+                    return True, "Success"
+                else:
+                    return False, "Audio file was not created or is empty"
+            else:
+                error_msg = f"eSpeak command failed: {result.stderr}"
+                print(f"❌ {error_msg}")
+                return False, error_msg
+                
+        except subprocess.TimeoutExpired:
+            return False, "eSpeak conversion timed out"
+        except FileNotFoundError:
+            return False, "eSpeak command not found - please install espeak"
+        except Exception as e:
+            error_msg = f"Direct eSpeak conversion failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            return False, error_msg
+
     def get_supported_formats(self) -> List[str]:
         """Get supported output audio formats"""
         # pyttsx3 typically supports WAV format
@@ -529,11 +627,35 @@ class TTSService:
     
     def health_check(self) -> Dict:
         """Check TTS service health"""
+        if not self.is_initialized:
+            # Check if direct eSpeak is available as fallback
+            try:
+                import subprocess
+                result = subprocess.run(['espeak', '--version'], 
+                                      capture_output=True, timeout=5)
+                espeak_available = result.returncode == 0
+                espeak_version = result.stdout.decode().strip() if espeak_available else None
+            except:
+                espeak_available = False
+                espeak_version = None
+            
+            return {
+                'initialized': False,
+                'pyttsx3_available': False,
+                'espeak_available': espeak_available,
+                'espeak_version': espeak_version,
+                'voices_available': 3 if espeak_available else 0,  # Fallback voices
+                'supported_formats': self.get_supported_formats(),
+                'mode': 'direct_espeak' if espeak_available else 'unavailable'
+            }
+        
         return {
             'initialized': self.is_initialized,
+            'pyttsx3_available': True,
             'voices_available': len(self.available_voices),
             'supported_formats': self.get_supported_formats(),
-            'engine_properties': self.get_engine_properties() if self.is_initialized else {}
+            'engine_properties': self.get_engine_properties(),
+            'mode': 'pyttsx3'
         }
 
 # Global TTS service instance
