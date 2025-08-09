@@ -70,7 +70,8 @@ def main():
         sys.exit(1)
     
     print("\n🎉 Deployment completed!")
-    print("🌐 Your app should be live at: https://filealchemy-production.up.railway.app")
+    print("🌐 Your app is live at: https://filealchemy-production.up.railway.app")
+    print("🔧 Frontend now configured for production mode - always uses Railway backend")
     print("⏳ It may take a few minutes for changes to propagate")
     
     # Run comprehensive test
