@@ -214,6 +214,25 @@ const TTSPage = ({ onBack, onNavigate }) => {
       return;
     }
 
+    // For preview, limit to 500 characters and find a good break point
+    let previewText = validation.text;
+    if (validation.text.length > 500) {
+      // Try to break at a sentence or word boundary
+      const truncated = validation.text.substring(0, 500);
+      const lastSentence = truncated.lastIndexOf('.');
+      const lastSpace = truncated.lastIndexOf(' ');
+      
+      if (lastSentence > 400) {
+        previewText = truncated.substring(0, lastSentence + 1);
+      } else if (lastSpace > 400) {
+        previewText = truncated.substring(0, lastSpace) + '...';
+      } else {
+        previewText = truncated + '...';
+      }
+      
+      addNotification('info', `Preview limited to ${previewText.length} characters for faster testing`);
+    }
+
     const optionsValidation = ttsService.validateOptions({
       rate,
       volume,
@@ -227,7 +246,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
 
     try {
       setIsPreviewing(true);
-      await ttsService.previewSpeech(validation.text, optionsValidation.options);
+      await ttsService.previewSpeech(previewText, optionsValidation.options);
       const voiceName = voices.find(v => v.id === selectedVoice || v.index?.toString() === selectedVoice)?.name || 'Selected voice';
       addNotification('success', `${voiceName} preview completed`);
     } catch (error) {
@@ -539,7 +558,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setText("Welcome to FileAlchemy's premium Text-to-Speech feature! Powered by Google's advanced neural technology, we now offer 20 high-quality voices across multiple languages and regions. Experience crystal-clear, human-like speech synthesis with customizable speed and volume controls. From English with US, UK, Australian, and Canadian accents to Spanish, French, German, and many more languages - our TTS service delivers professional-grade audio perfect for accessibility, education, and content creation.")}
+                  onClick={() => setText("Welcome to FileAlchemy's premium Text-to-Speech! Powered by Google's neural technology, we offer 20 high-quality voices across multiple languages. Experience crystal-clear, human-like speech with customizable controls. Perfect for accessibility, education, and content creation.")}
                 >
                   Sample Text
                 </Button>
@@ -670,13 +689,20 @@ const TTSPage = ({ onBack, onNavigate }) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handlePreview()}
+                      onClick={() => {
+                        // Temporarily clear text to use default test phrase
+                        const originalText = text;
+                        setText('');
+                        handlePreview().finally(() => {
+                          setText(originalText);
+                        });
+                      }}
                       disabled={isPreviewing || !selectedVoice}
-                      className="w-full text-xs py-2"
+                      className="w-full text-xs py-2 voice-test-btn"
                     >
                       {isPreviewing ? (
                         <>
-                          <div className="w-3 h-3 mr-2 animate-spin rounded-full border border-current border-t-transparent"></div>
+                          <div className="w-3 h-3 mr-2 voice-test-spinner"></div>
                           Testing Voice...
                         </>
                       ) : (
@@ -684,7 +710,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
                           <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          Test Voice
+                          Quick Voice Test
                         </>
                       )}
                     </Button>
@@ -800,7 +826,7 @@ const TTSPage = ({ onBack, onNavigate }) => {
               variant="secondary"
               size="lg"
               onClick={handlePreview}
-              disabled={!text.trim() || isPreviewing || voices.length === 0}
+              disabled={isPreviewing || voices.length === 0}
               loading={isPreviewing}
               className="flex-1"
             >
@@ -809,7 +835,11 @@ const TTSPage = ({ onBack, onNavigate }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               )}
-              {isPreviewing ? 'Playing Preview...' : 'Preview Speech'}
+              {isPreviewing ? 'Playing Preview...' : 
+               text.trim() ? 
+                 (text.length > 500 ? 'Preview Speech (First ~500 chars)' : 'Preview Speech') : 
+                 'Test Voice'
+              }
             </Button>
 
             <Button
