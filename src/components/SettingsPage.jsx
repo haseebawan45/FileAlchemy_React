@@ -21,8 +21,8 @@ const SettingsPage = ({ history, onClearHistory }) => {
       title: 'Show Notifications',
       description: 'Display toast notifications for conversion status',
       type: 'toggle',
-      value: true, // Default enabled
-      action: () => { } // Placeholder
+      value: state.notificationsEnabled,
+      action: () => dispatch({ type: actions.TOGGLE_NOTIFICATIONS })
     },
     {
       id: 'autoDownload',

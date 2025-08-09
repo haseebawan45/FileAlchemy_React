@@ -13,25 +13,37 @@ const getInitialDarkMode = () => {
   return false;
 };
 
+// Get initial notification setting from localStorage
+const getInitialNotificationSetting = () => {
+  const saved = localStorage.getItem('filealchemy-notifications');
+  if (saved !== null) {
+    return saved === 'true';
+  }
+  return true; // Default to enabled
+};
+
 // Initial state
 const initialState = {
   // Theme
   darkMode: getInitialDarkMode(),
-  
+
+  // Settings
+  notificationsEnabled: getInitialNotificationSetting(),
+
   // Current conversion
   selectedCategory: null,
   sourceFormat: null,
   targetFormat: null,
-  
+
   // File handling
   selectedFiles: [],
   previewUrls: [],
-  
+
   // Conversion status
   isConverting: false,
   progress: 0,
   conversionResults: [],
-  
+
   // UI state
   notifications: []
 };
@@ -39,7 +51,8 @@ const initialState = {
 // Action types
 const ActionTypes = {
   TOGGLE_DARK_MODE: 'TOGGLE_DARK_MODE',
-  SET_CONVERSION: 'SET_CONVERSION', 
+  TOGGLE_NOTIFICATIONS: 'TOGGLE_NOTIFICATIONS',
+  SET_CONVERSION: 'SET_CONVERSION',
   SET_FILES: 'SET_FILES',
   ADD_FILES: 'ADD_FILES',
   REMOVE_FILE: 'REMOVE_FILE',
@@ -61,6 +74,12 @@ function appReducer(state, action) {
       return {
         ...state,
         darkMode: !state.darkMode
+      };
+
+    case ActionTypes.TOGGLE_NOTIFICATIONS:
+      return {
+        ...state,
+        notificationsEnabled: !state.notificationsEnabled
       };
 
     case ActionTypes.SET_CONVERSION:
@@ -150,6 +169,10 @@ function appReducer(state, action) {
       };
 
     case ActionTypes.ADD_NOTIFICATION:
+      // Don't add notifications if they're disabled
+      if (!state.notificationsEnabled) {
+        return state;
+      }
       return {
         ...state,
         notifications: [...state.notifications, {
@@ -202,14 +225,19 @@ export function AppProvider({ children }) {
     }
   }, [state.darkMode]);
 
+  // Update localStorage when notification setting changes
+  useEffect(() => {
+    localStorage.setItem('filealchemy-notifications', state.notificationsEnabled.toString());
+  }, [state.notificationsEnabled]);
+
   // Auto-remove notifications after 5 seconds
   useEffect(() => {
     if (state.notifications.length > 0) {
       const latestNotification = state.notifications[state.notifications.length - 1];
       const timer = setTimeout(() => {
-        dispatch({ 
-          type: ActionTypes.REMOVE_NOTIFICATION, 
-          payload: { id: latestNotification.id } 
+        dispatch({
+          type: ActionTypes.REMOVE_NOTIFICATION,
+          payload: { id: latestNotification.id }
         });
       }, 5000);
 

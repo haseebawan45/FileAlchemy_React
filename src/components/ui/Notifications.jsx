@@ -8,7 +8,8 @@ const Notifications = () => {
     dispatch({ type: actions.REMOVE_NOTIFICATION, payload: { id } });
   };
 
-  if (state.notifications.length === 0) return null;
+  // Don't render notifications if they're disabled
+  if (!state.notificationsEnabled || state.notifications.length === 0) return null;
 
   return (
     <div className="fixed top-20 right-4 z-40 space-y-2 max-w-sm">
