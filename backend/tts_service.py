@@ -139,10 +139,14 @@ class TTSService:
             return {}
         
         try:
+            voice_obj = self.engine.getProperty('voice')
+            # Convert voice object to string to avoid JSON serialization issues
+            voice_str = str(voice_obj) if voice_obj else 'default'
+            
             return {
                 'rate': self.engine.getProperty('rate'),
                 'volume': self.engine.getProperty('volume'),
-                'voice': self.engine.getProperty('voice')
+                'voice': voice_str
             }
         except Exception as e:
             print(f"Warning: Could not get engine properties: {e}")
