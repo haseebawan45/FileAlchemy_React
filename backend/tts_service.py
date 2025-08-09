@@ -209,7 +209,8 @@ class TTSService:
                     except Exception as e:
                         print(f"Warning: Could not set volume to {volume}: {e}")
                 
-                if voice_id is not None and voice_id != '' and voice_id != 'default':
+                # Temporarily disable voice selection to fix eSpeak issues
+                if False:  # voice_id is not None and voice_id != '' and voice_id != 'default':
                     try:
                         voices = self.engine.getProperty('voices')
                         if voices:
@@ -302,7 +303,10 @@ class TTSService:
                     try:
                         temp_engine = pyttsx3.init(driverName='espeak')
                     except:
-                        temp_engine = pyttsx3.init()
+                        try:
+                            temp_engine = pyttsx3.init()
+                        except:
+                            temp_engine = pyttsx3.init(driverName='dummy')
                 else:
                     temp_engine = pyttsx3.init()
                 
@@ -317,7 +321,8 @@ class TTSService:
                 else:
                     temp_engine.setProperty('volume', 0.9)  # Default volume
                 
-                if voice_id is not None and voice_id != '' and voice_id != 'default':
+                # Temporarily disable voice selection to fix eSpeak issues
+                if False:  # voice_id is not None and voice_id != '' and voice_id != 'default':
                     try:
                         voices = temp_engine.getProperty('voices')
                         if voices:
@@ -418,7 +423,8 @@ class TTSService:
                 else:
                     temp_engine.setProperty('volume', 0.9)
                 
-                if voice_id is not None and voice_id != '' and voice_id != 'default':
+                # Temporarily disable voice selection to fix eSpeak issues
+                if False:  # voice_id is not None and voice_id != '' and voice_id != 'default':
                     try:
                         voices = temp_engine.getProperty('voices')
                         if voices:
